@@ -9,7 +9,7 @@ per-platform code tabs, one-click **copy**, and **download-as-script**.
 
 ## Features
 
-- **254 entries** across 10 categories: System Info, Network, Users & Access, Disk & Files,
+- **253 entries** across 10 categories: System Info, Network, Users & Access, Disk & Files,
   Processes & Services, Forensics, Security, Maintenance, Active Directory, and Python Examples.
 - **Five code targets** per entry where they apply: PowerShell (`ps`), Windows CMD (`cmd`),
   macOS (`mac`, BSD userland), Linux (`linux`, GNU/systemd), and Python (`py`). Only the
