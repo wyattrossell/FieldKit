@@ -3509,5 +3509,170 @@ Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4688} -MaxEvents 20 |
   linux:`sudo auditctl -w /etc/passwd -p wa -k passwd_changes
 sudo auditctl -a always,exit -F arch=b64 -S execve -k exec_log
 sudo ausearch -k exec_log | tail`
+ }},
+
+/* ================= PACKAGE MANAGERS ================= */
+{id:"pkg-search", cat:"Package Managers", title:"Search for a package",
+ desc:"Find a package by name/keyword. Windows: winget/choco; macOS: brew; Linux: apt/dnf/pacman.",
+ tags:["package-manager"],
+ code:{
+  ps:`winget search {{NAME:7zip}}`,
+  cmd:`choco search {{NAME:7zip}}`,
+  mac:`brew search {{NAME:wget}}`,
+  linux:`apt-cache search {{NAME:wget}}   # dnf: dnf search {{NAME:wget}}   pacman: pacman -Ss {{NAME:wget}}`
+ }},
+{id:"pkg-install", cat:"Package Managers", title:"Install a package",
+ desc:"Install a package from the default repositories.",
+ danger:"Installs software; needs admin/root.",
+ tags:["package-manager"],
+ code:{
+  ps:`winget install {{NAME:Git.Git}}`,
+  cmd:`choco install {{NAME:git}} -y`,
+  mac:`brew install {{NAME:git}}`,
+  linux:`sudo apt install {{NAME:git}}   # dnf: sudo dnf install {{NAME:git}}   pacman: sudo pacman -S {{NAME:git}}`
+ }},
+{id:"pkg-remove", cat:"Package Managers", title:"Uninstall a package",
+ desc:"Remove an installed package.",
+ danger:"Removes software; needs admin/root.",
+ tags:["package-manager"],
+ code:{
+  ps:`winget uninstall {{NAME:Git.Git}}`,
+  cmd:`choco uninstall {{NAME:git}} -y`,
+  mac:`brew uninstall {{NAME:git}}`,
+  linux:`sudo apt remove {{NAME:git}}   # dnf: sudo dnf remove {{NAME:git}}   pacman: sudo pacman -R {{NAME:git}}`
+ }},
+{id:"pkg-upgrade-all", cat:"Package Managers", title:"Upgrade everything",
+ desc:"Update repository metadata and upgrade all installed packages.",
+ danger:"Upgrades installed software and may restart services. Needs admin/root.",
+ tags:["package-manager"],
+ code:{
+  ps:`winget upgrade --all`,
+  cmd:`choco upgrade all -y`,
+  mac:`brew update && brew upgrade`,
+  linux:`sudo apt update && sudo apt upgrade -y   # dnf: sudo dnf upgrade   pacman: sudo pacman -Syu`
+ }},
+{id:"pkg-list", cat:"Package Managers", title:"List installed packages",
+ desc:"Enumerate installed packages and versions.",
+ tags:["package-manager"],
+ code:{
+  ps:`winget list`,
+  cmd:`choco list --local-only`,
+  mac:`brew list --versions`,
+  linux:`apt list --installed 2>/dev/null   # dnf: dnf list installed   pacman: pacman -Q`
+ }},
+{id:"pkg-info", cat:"Package Managers", title:"Show package details",
+ desc:"Version, dependencies, and description for a package.",
+ tags:["package-manager"],
+ code:{
+  ps:`winget show {{NAME:Git.Git}}`,
+  mac:`brew info {{NAME:git}}`,
+  linux:`apt show {{NAME:git}}   # dnf: dnf info {{NAME:git}}   pacman: pacman -Si {{NAME:git}}`
+ }},
+{id:"pkg-outdated", cat:"Package Managers", title:"List upgradable packages",
+ desc:"Show which installed packages have newer versions available.",
+ tags:["package-manager"],
+ code:{
+  ps:`winget upgrade`,
+  mac:`brew outdated`,
+  linux:`apt list --upgradable 2>/dev/null   # dnf: dnf check-update   pacman: pacman -Qu`
+ }},
+{id:"pkg-clean", cat:"Package Managers", title:"Clean package caches",
+ desc:"Reclaim disk space by removing cached downloads/old versions.",
+ danger:"Deletes cached package files.",
+ tags:["package-manager"],
+ code:{
+  mac:`brew cleanup`,
+  linux:`sudo apt clean && sudo apt autoclean   # dnf: sudo dnf clean all`
+ }},
+{id:"pkg-autoremove", cat:"Package Managers", title:"Remove orphaned dependencies",
+ desc:"Remove packages that were installed as dependencies and are no longer needed.",
+ danger:"Removes packages; review the list before confirming.",
+ tags:["package-manager"],
+ code:{
+  mac:`brew autoremove`,
+  linux:`sudo apt autoremove   # dnf: sudo dnf autoremove   pacman: pacman -Qdtq | sudo pacman -Rns -`
+ }},
+{id:"pkg-owns-file", cat:"Package Managers", title:"Which package owns a file",
+ desc:"Map a file on disk back to the package that installed it (Linux).",
+ tags:["package-manager","linux"],
+ code:{
+  linux:`dpkg -S {{FILE:/usr/bin/ssh}}   # rpm: rpm -qf {{FILE:/usr/bin/ssh}}`
+ }},
+{id:"pkg-files", cat:"Package Managers", title:"List a package's files",
+ desc:"Show every file a package placed on disk.",
+ tags:["package-manager"],
+ code:{
+  mac:`brew list {{NAME:git}}`,
+  linux:`dpkg -L {{NAME:openssh-client}}   # rpm: rpm -ql {{NAME:openssh}}`
+ }},
+{id:"pkg-hold", cat:"Package Managers", title:"Pin / hold a package version",
+ desc:"Prevent a package from being upgraded.",
+ danger:"Blocks security updates for the held package until you unhold it.",
+ tags:["package-manager"],
+ code:{
+  ps:`winget pin add {{NAME:Git.Git}}   # remove: winget pin remove {{NAME:Git.Git}}`,
+  mac:`brew pin {{NAME:node}}   # unpin: brew unpin {{NAME:node}}`,
+  linux:`sudo apt-mark hold {{NAME:nginx}}   # unhold: sudo apt-mark unhold {{NAME:nginx}} ; dnf: dnf versionlock add`
+ }},
+{id:"pkg-verify", cat:"Package Managers", title:"Verify installed package integrity",
+ desc:"Check installed files against the package database for tampering/corruption (Linux).",
+ danger:"Requires elevation to read all package files.",
+ tags:["package-manager","linux","detection"],
+ code:{
+  linux:`sudo debsums -c 2>/dev/null   # RPM: rpm -Va | head`
+ }},
+{id:"pkg-history", cat:"Package Managers", title:"Recent install / upgrade history",
+ desc:"Review recent package changes on the system.",
+ tags:["package-manager"],
+ code:{
+  linux:`grep -E ' install | upgrade | remove ' /var/log/dpkg.log 2>/dev/null | tail -20   # dnf: dnf history`,
+  mac:`ls -lt "$(brew --cellar)" 2>/dev/null | head   # Homebrew keeps no global log`
+ }},
+{id:"pkg-download", cat:"Package Managers", title:"Download a package without installing",
+ desc:"Fetch a package (and optionally its deps) for offline use or inspection.",
+ tags:["package-manager"],
+ code:{
+  mac:`brew fetch {{NAME:git}}`,
+  linux:`apt download {{NAME:git}}   # with deps: sudo apt install --download-only {{NAME:git}}`
+ }},
+{id:"pkg-winget-export", cat:"Package Managers", title:"Export / import installed list (Windows)",
+ desc:"Snapshot installed winget packages to a file and replay on another machine.",
+ tags:["package-manager","windows","automation"],
+ code:{
+  ps:`winget export -o packages.json
+# on a new machine: winget import -i packages.json`
+ }},
+{id:"pkg-scoop", cat:"Package Managers", title:"Scoop (user-scope, Windows)",
+ desc:"Scoop installs Windows CLI tools without admin. Requires scoop (scoop.sh).",
+ tags:["package-manager","windows"],
+ code:{
+  ps:`scoop install {{NAME:ripgrep}}   # search: scoop search {{NAME:ripgrep}} ; update all: scoop update *`
+ }},
+{id:"pkg-pip", cat:"Package Managers", title:"pip: install / list Python packages",
+ desc:"Manage Python packages with pip. Prefer a virtual environment over system-wide installs.",
+ tags:["package-manager"],
+ code:{
+  ps:`python -m pip install {{PKG:requests}}
+python -m pip list`,
+  mac:`python3 -m pip install {{PKG:requests}}
+python3 -m pip list`,
+  linux:`python3 -m pip install {{PKG:requests}}
+python3 -m pip list`
+ }},
+{id:"pkg-pip-outdated", cat:"Package Managers", title:"pip: list outdated packages",
+ desc:"Show installed Python packages that have newer versions.",
+ tags:["package-manager"],
+ code:{
+  ps:`python -m pip list --outdated`,
+  mac:`python3 -m pip list --outdated`,
+  linux:`python3 -m pip list --outdated`
+ }},
+{id:"pkg-npm-global", cat:"Package Managers", title:"npm: global packages",
+ desc:"Install, list, and check global Node packages. Requires node/npm.",
+ tags:["package-manager"],
+ code:{
+  ps:`npm install -g {{PKG:npm}}   # list: npm list -g --depth=0 ; outdated: npm outdated -g`,
+  mac:`npm install -g {{PKG:npm}}   # list: npm list -g --depth=0 ; outdated: npm outdated -g`,
+  linux:`sudo npm install -g {{PKG:npm}}   # list: npm list -g --depth=0`
  }}
 ];
