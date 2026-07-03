@@ -29,6 +29,7 @@ const ALLOWED_TAGS = new Set([
   "cross-platform","teaching","reference",
   "dns","smb","snmp","discovery","scanning","subdomain","banner","mail",
   "persistence","memory","containment","timeline","process","account",
+  "ldap",
 ]);
 
 const errors = [];

@@ -3674,5 +3674,218 @@ python3 -m pip list`
   ps:`npm install -g {{PKG:npm}}   # list: npm list -g --depth=0 ; outdated: npm outdated -g`,
   mac:`npm install -g {{PKG:npm}}   # list: npm list -g --depth=0 ; outdated: npm outdated -g`,
   linux:`sudo npm install -g {{PKG:npm}}   # list: npm list -g --depth=0`
+ }},
+
+/* ================= ENUMERATION ================= */
+{id:"enum-whoami-priv", cat:"Enumeration", title:"Current user, groups & privileges",
+ desc:"First situational-awareness step after access: who am I, my groups, and my rights.",
+ danger:"Post-exploitation enumeration — authorized engagements only.",
+ team:"red", tags:["enumeration","account"], attack:["T1033"],
+ detect:"Discovery binaries (whoami/id) are low-signal alone; EDR flags them inside rapid discovery bursts; Sysmon 1 / 4688.",
+ mitigate:"Least privilege limits what enumeration reveals; EDR discovery analytics.",
+ code:{
+  ps:`whoami /all`,
+  cmd:`whoami /priv`,
+  mac:`id; groups`,
+  linux:`id; sudo -n true 2>/dev/null && echo "passwordless sudo available"`
+ }},
+{id:"enum-system-info", cat:"Enumeration", title:"OS build & patch level",
+ desc:"OS version, build, and architecture for exploit/privilege matching.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration"], attack:["T1082"],
+ detect:"systeminfo/uname execution; correlated discovery activity in EDR.",
+ mitigate:"Patch promptly so version disclosure yields no usable exploit; EDR analytics.",
+ code:{
+  ps:`systeminfo`,
+  mac:`sw_vers; uname -a`,
+  linux:`uname -a; cat /etc/os-release 2>/dev/null; hostnamectl 2>/dev/null`
+ }},
+{id:"enum-network-local", cat:"Enumeration", title:"Local network view",
+ desc:"Interfaces, routes, ARP neighbors, and active connections from the host's perspective.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","network"], attack:["T1016"],
+ detect:"ipconfig/route/arp/netstat sequence; EDR discovery correlation.",
+ mitigate:"Segmentation limits what neighbors reveal; monitor discovery sequences.",
+ code:{
+  ps:`ipconfig /all; route print; arp -a; netstat -ano`,
+  mac:`ifconfig; netstat -rn; arp -an; netstat -an`,
+  linux:`ip a; ip route; ip neigh; ss -tunap`
+ }},
+{id:"enum-processes", cat:"Enumeration", title:"Processes & owners",
+ desc:"Running processes with owners — spot AV/EDR, interesting services, and credential-bearing apps.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","process"], attack:["T1057"],
+ detect:"Process listing is low-signal; suspicious when paired with credential access.",
+ mitigate:"EDR; restrict tooling; least privilege.",
+ code:{
+  ps:`Get-Process -IncludeUserName | Sort-Object CPU -Descending | Select-Object -First 30`,
+  mac:`ps auxww`,
+  linux:`ps auxww`
+ }},
+{id:"enum-installed-software", cat:"Enumeration", title:"Installed software & versions",
+ desc:"Enumerate installed applications for vulnerable-version matching.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration"], attack:["T1518"],
+ detect:"Uninstall-registry / package-db reads; EDR discovery analytics.",
+ mitigate:"Patch management; remove unused software.",
+ code:{
+  ps:`Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*, HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* -ErrorAction SilentlyContinue | Where-Object DisplayName | Select-Object DisplayName, DisplayVersion | Sort-Object DisplayName`,
+  mac:`ls /Applications; brew list --versions 2>/dev/null`,
+  linux:`dpkg -l 2>/dev/null || rpm -qa`
+ }},
+{id:"enum-services-weak", cat:"Enumeration", title:"Weak service paths (Windows)",
+ desc:"Services with unquoted paths containing spaces — a classic local privilege-escalation vector.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","privesc"], attack:["T1574.009"],
+ detect:"Enumeration of Win32_Service; abuse would show a service starting an unexpected binary.",
+ mitigate:"Quote all service ImagePaths; restrict permissions on service dirs.",
+ code:{
+  ps:`Get-CimInstance Win32_Service | Where-Object { $_.PathName -match ' ' -and $_.PathName -notmatch '^"' -and $_.PathName -notmatch 'Windows' } | Select-Object Name, PathName, StartName`
+ }},
+{id:"enum-sudo", cat:"Enumeration", title:"Sudo rights (Linux/macOS)",
+ desc:"List what the current user may run via sudo — a top privilege-escalation path.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","privesc"], attack:["T1033"],
+ detect:"sudo -l invocation appears in auth logs / sudo logs.",
+ mitigate:"Minimal, specific sudo rules; no NOPASSWD on shells/interpreters; monitor sudo logs.",
+ code:{
+  linux:`sudo -l 2>/dev/null`,
+  mac:`sudo -l 2>/dev/null`
+ }},
+{id:"enum-suid", cat:"Enumeration", title:"SUID / SGID binaries (Linux/macOS)",
+ desc:"Find set-uid/set-gid binaries that may allow privilege escalation (check against GTFOBins).",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","privesc"], attack:["T1548.001"],
+ detect:"A recursive find across the filesystem is visible to auditd (execve of find) and file-access telemetry.",
+ mitigate:"Remove unnecessary SUID bits; monitor for new SUID files; mount noexec/nosuid where possible.",
+ code:{
+  linux:`find / -perm -4000 -type f 2>/dev/null; echo "-- SGID --"; find / -perm -2000 -type f 2>/dev/null`,
+  mac:`find / -perm -4000 -type f 2>/dev/null`
+ }},
+{id:"enum-cred-hunt", cat:"Enumeration", title:"Hunt for stored credentials",
+ desc:"Search common locations for secrets — key files, configs, and shell histories.",
+ danger:"Authorized engagements only; may surface real secrets — handle per rules of engagement.",
+ team:"red", tags:["enumeration","password"], attack:["T1552.001"],
+ detect:"Bulk recursive reads/greps of home and config dirs; file-access spikes; EDR credential-access analytics.",
+ mitigate:"Use a secrets manager; never store plaintext creds; restrict file permissions; clear histories.",
+ code:{
+  ps:`Get-ChildItem $env:USERPROFILE -Recurse -Include *.kdbx,*.ppk,id_rsa,*.pem,unattend.xml -ErrorAction SilentlyContinue | Select-Object FullName`,
+  linux:`grep -rIl -e password -e secret -e api_key /home /etc 2>/dev/null | head
+ls -la ~/.aws ~/.ssh ~/.config 2>/dev/null; grep -Ei 'pass|token|key' ~/.*_history 2>/dev/null | head`,
+  mac:`ls -la ~/.aws ~/.ssh 2>/dev/null; grep -Ei 'pass|token|key' ~/.*_history 2>/dev/null | head`
+ }},
+{id:"enum-av-edr", cat:"Enumeration", title:"Installed security products (Windows)",
+ desc:"Identify AV/EDR present to understand monitoring before acting.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","detection"], attack:["T1518.001"],
+ detect:"Queries to SecurityCenter2 / enumeration of security services can itself be an EDR signal.",
+ mitigate:"Tamper protection on EDR; alert on security-product enumeration.",
+ code:{
+  ps:`Get-CimInstance -Namespace root/SecurityCenter2 -Class AntiVirusProduct -ErrorAction SilentlyContinue | Select-Object displayName, productState
+Get-Service | Where-Object { $_.DisplayName -match 'Defender|CrowdStrike|Carbon Black|SentinelOne|Cylance|Sophos|McAfee|Cortex' }`
+ }},
+{id:"enum-tokens", cat:"Enumeration", title:"Abusable privileges (Windows)",
+ desc:"Check for privileges that enable escalation (SeImpersonate, SeDebug, SeBackup, etc.).",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","privesc"], attack:["T1134"],
+ detect:"whoami /priv is low-signal; subsequent token abuse is the detectable event.",
+ mitigate:"Minimize privilege assignments; monitor for token-manipulation behavior.",
+ code:{
+  ps:`whoami /priv | findstr /i "SeImpersonate SeAssignPrimaryToken SeDebug SeBackup SeRestore SeTakeOwnership"`
+ }},
+{id:"enum-domain-native", cat:"Enumeration", title:"Native AD enumeration (domain-joined)",
+ desc:"Enumerate the domain from a joined host using only built-in tools (no extra binaries).",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","active-directory","account"], attack:["T1087.002","T1482"],
+ detect:"net.exe / nltest against a DC; spikes of SAMR/LDAP from a workstation.",
+ mitigate:"Restrict anonymous/authenticated enumeration; monitor SAMR/LDAP; tiered admin.",
+ code:{
+  ps:`nltest /dclist:{{DOMAIN:example.com}}
+net group "Domain Admins" /domain
+net accounts /domain`,
+  cmd:`nltest /dclist:{{DOMAIN:example.com}}
+net group "Domain Admins" /domain`
+ }},
+{id:"enum-ldap", cat:"Enumeration", title:"LDAP / AD enumeration (ldapsearch)",
+ desc:"Query Active Directory over LDAP for users and attributes. Requires ldap-utils.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","active-directory","ldap"], attack:["T1087.002"],
+ detect:"High-volume LDAP queries from a non-admin host; DC 1644 verbose search logging.",
+ mitigate:"Limit LDAP read scope; alert on bulk queries; LDAP signing/channel binding.",
+ code:{
+  linux:`ldapsearch -x -H ldap://{{DC:10.0.0.10}} -b "dc=example,dc=com" -D "{{USER:user@example.com}}" -w '{{PASS:}}' "(objectClass=user)" sAMAccountName`,
+  mac:`ldapsearch -x -H ldap://{{DC:10.0.0.10}} -b "dc=example,dc=com" -D "{{USER:user@example.com}}" -w '{{PASS:}}' "(objectClass=user)" sAMAccountName`
+ }},
+{id:"enum-kerbrute", cat:"Enumeration", title:"Kerberos username enumeration",
+ desc:"Validate domain usernames via Kerberos pre-auth (AS-REQ) without triggering lockouts. Requires kerbrute.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","active-directory","account"], attack:["T1087"],
+ detect:"Many Kerberos 4768/4771 pre-auth failures for distinct usernames from one source.",
+ mitigate:"Alert on 4768/4771 spikes; account-name hygiene; honeytokens.",
+ code:{
+  linux:`kerbrute userenum -d {{DOMAIN:example.com}} --dc {{DC:10.0.0.10}} {{WORDLIST:users.txt}}`
+ }},
+{id:"enum-smbmap", cat:"Enumeration", title:"SMB share access mapping",
+ desc:"Enumerate reachable SMB shares and your access level across hosts. Requires smbmap (or crackmapexec).",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","smb"], attack:["T1135"],
+ detect:"Authenticated SMB tree connects across many hosts; Windows 5140 share access.",
+ mitigate:"Least-privilege share ACLs; SMB signing; alert on wide share access.",
+ code:{
+  linux:`smbmap -H {{IP:10.0.0.5}} -u {{USER:guest}} -p ''   # or: crackmapexec smb {{TARGET:10.0.0.0/24}} --shares`,
+  mac:`smbmap -H {{IP:10.0.0.5}} -u {{USER:guest}} -p ''`
+ }},
+{id:"enum-crackmapexec", cat:"Enumeration", title:"Multi-protocol enumeration (CME/NetExec)",
+ desc:"Sweep SMB/LDAP/WinRM across a range for shares, users, and access. Requires crackmapexec/netexec.",
+ danger:"Authorized engagements only; credential use can trigger lockouts.",
+ team:"red", tags:["enumeration","smb","active-directory"], attack:["T1135","T1087"],
+ detect:"Same credential authenticating to many hosts rapidly; 4624/4625 and 5140 bursts.",
+ mitigate:"Lockout policy; MFA; alert on lateral auth patterns; LAPS.",
+ code:{
+  linux:`crackmapexec smb {{TARGET:10.0.0.0/24}} -u {{USER:user}} -p '{{PASS:}}' --shares --users`
+ }},
+{id:"enum-nfs", cat:"Enumeration", title:"NFS exports",
+ desc:"List NFS shares a host exports (often world-readable).",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","network"], attack:["T1135"],
+ detect:"showmount/RPC mountd queries in server logs.",
+ mitigate:"Restrict exports by host; use Kerberos NFS; avoid no_root_squash.",
+ code:{
+  linux:`showmount -e {{IP:10.0.0.5}}`,
+  mac:`showmount -e {{IP:10.0.0.5}}`
+ }},
+{id:"enum-passpol", cat:"Enumeration", title:"Password & lockout policy",
+ desc:"Read the account policy to plan spraying without triggering lockouts.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","account"], attack:["T1201"],
+ detect:"Policy reads are low-signal; the follow-on spray is the detectable event (4625 bursts).",
+ mitigate:"Sensible lockout thresholds; MFA; alert on distributed auth failures.",
+ code:{
+  ps:`net accounts`,
+  linux:`grep -E '^PASS_' /etc/login.defs; grep -h faillock /etc/pam.d/* 2>/dev/null | sort -u`,
+  mac:`pwpolicy getaccountpolicies 2>/dev/null | tail -n +2`
+ }},
+{id:"enum-mounts", cat:"Enumeration", title:"Drives, mounts & mapped shares",
+ desc:"Enumerate local volumes, removable media, and mapped network drives for data and pivots.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration"], attack:["T1120","T1135"],
+ detect:"Low-signal; correlate with subsequent access to mapped/removable media.",
+ mitigate:"Restrict removable media; least-privilege share mappings.",
+ code:{
+  ps:`Get-PSDrive -PSProvider FileSystem
+Get-CimInstance Win32_MappedLogicalDisk | Select-Object Name, ProviderName`,
+  mac:`mount; diskutil list`,
+  linux:`mount; lsblk`
+ }},
+{id:"enum-history", cat:"Enumeration", title:"Shell history for secrets",
+ desc:"Mine command history for credentials, tokens, and useful commands.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["enumeration","password"], attack:["T1552.003"],
+ detect:"Reads of history files; EDR credential-access analytics.",
+ mitigate:"Disable/limit history for sensitive shells; never pass secrets on the command line.",
+ code:{
+  ps:`Get-Content (Get-PSReadLineOption).HistorySavePath -Tail 200 | Select-String -Pattern 'pass|cred|token|-key|ConvertTo-SecureString'`,
+  linux:`grep -Ei 'pass|token|secret|-key|curl .*-u ' ~/.bash_history ~/.zsh_history 2>/dev/null`,
+  mac:`grep -Ei 'pass|token|secret|-key|curl .*-u ' ~/.zsh_history ~/.bash_history 2>/dev/null`
  }}
 ];
