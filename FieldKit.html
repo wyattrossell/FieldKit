@@ -122,7 +122,18 @@
   .empty{padding:40px 20px; text-align:center; color:var(--faint); font-size:13px}
   /* detail */
   .detail{overflow-y:auto; background:var(--bg); display:flex; flex-direction:column}
-  .detail .head{padding:18px 22px 14px; border-bottom:1px solid var(--edge)}
+  .detail .head{padding:18px 22px 14px; border-bottom:1px solid var(--edge); position:relative}
+  .favbtn{position:absolute; top:16px; right:20px; background:transparent; border:1px solid var(--edge); color:var(--faint); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:14px; line-height:1}
+  .favbtn.on{color:var(--amber); border-color:var(--amber-dim)}
+  .favbtn:hover{color:var(--ink)}
+  .tagbar{display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:8px 18px; border-bottom:1px solid var(--edge); background:var(--panel)}
+  .tagbar:empty{display:none}
+  .tagbar .lbl{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--faint); margin-right:4px}
+  .tagbar .t{font-family:var(--mono); font-size:10.5px; color:var(--muted); background:var(--bg); border:1px solid var(--edge2); border-radius:10px; padding:3px 9px; cursor:pointer}
+  .tagbar .t:hover{color:var(--ink)}
+  .tagbar .t.on{color:var(--amber); border-color:var(--amber-dim); background:var(--panel2)}
+  .tagbar .t .c{opacity:.5}
+  .tagbar .clear{font-family:var(--mono); font-size:10.5px; color:var(--faint); cursor:pointer; margin-left:4px; text-decoration:underline}
   .detail .cat-tag{
     font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--teal);
   }
@@ -221,6 +232,8 @@
   <input type="file" id="importFile" accept="application/json" style="display:none">
 </header>
 
+<div class="tagbar" id="tagbar"></div>
+
 <main>
   <nav class="rail" id="rail"><h4>Categories</h4></nav>
   <section class="list" id="list"></section>
@@ -286,15 +299,25 @@ let activeLangFilter = "all";
 let query = "";
 let selectedId = null;
 let selectedLang = null;
+let activeTags = new Set();
+
+const FAV_KEY = "fieldkit.favorites.v1";
+let favorites = new Set();
+function loadFavorites(){ try{ favorites = new Set(JSON.parse(localStorage.getItem(FAV_KEY)||"[]")); }catch(e){} }
+function isFav(id){ return favorites.has(id); }
+function toggleFav(id){ favorites.has(id) ? favorites.delete(id) : favorites.add(id);
+  try{ localStorage.setItem(FAV_KEY, JSON.stringify([...favorites])); }catch(e){} }
 
 const $ = s => document.querySelector(s);
-const railEl=$("#rail"), listEl=$("#list"), detailEl=$("#detail");
+const railEl=$("#rail"), listEl=$("#list"), detailEl=$("#detail"), tagbarEl=$("#tagbar");
 
 function langsOf(item){ return item.code ? Object.keys(LANGS).filter(l=>item.code[l]) : []; }
 function isTool(item){ return !item.code && !!(item.install || item.url); }
 
 function matches(item){
-  if(activeCat!=="All" && item.cat!==activeCat) return false;
+  if(activeCat==="__fav"){ if(!favorites.has(item.id)) return false; }
+  else if(activeCat!=="All" && item.cat!==activeCat) return false;
+  if(activeTags.size && !(item.tags && [...activeTags].every(t=>item.tags.includes(t)))) return false;
   if(activeLangFilter!=="all" && !(item.code && item.code[activeLangFilter])) return false;
   if(query){
     const codeText = item.code ? Object.values(item.code).join(" ")
@@ -308,18 +331,35 @@ function matches(item){
 
 function renderRail(){
   const cats=[...new Set(library.map(i=>i.cat))];
-  const counts=c=> c==="All" ? library.length : library.filter(i=>i.cat===c).length;
+  const counts=c=> c==="All" ? library.length : c==="__fav" ? favorites.size : library.filter(i=>i.cat===c).length;
   let html=`<h4>Categories</h4>`;
-  html+=railItem("All");
-  cats.forEach(c=>html+=railItem(c));
+  html+=railItem("All","All");
+  if(favorites.size) html+=railItem("__fav","★ Favorites");
+  cats.forEach(c=>html+=railItem(c,c));
   railEl.innerHTML=html;
   railEl.querySelectorAll(".cat").forEach(el=>{
     el.onclick=()=>{ activeCat=el.dataset.c; renderRail(); renderList(); };
   });
-  function railItem(c){
+  renderTagBar();
+  function railItem(c,label){
     return `<div class="cat ${c===activeCat?'on':''}" data-c="${c}">
-      <span>${c}</span><span class="n">${counts(c)}</span></div>`;
+      <span>${esc(label)}</span><span class="n">${counts(c)}</span></div>`;
   }
+}
+
+function renderTagBar(){
+  const universe={};
+  library.forEach(i=>(i.tags||[]).forEach(t=>universe[t]=(universe[t]||0)+1));
+  const tags=Object.keys(universe).sort();
+  if(!tags.length){ tagbarEl.innerHTML=""; return; }
+  let html=`<span class="lbl">Tags</span>`;
+  html+=tags.map(t=>`<span class="t ${activeTags.has(t)?'on':''}" data-t="${esc(t)}">${esc(t)} <span class="c">${universe[t]}</span></span>`).join("");
+  if(activeTags.size) html+=`<span class="clear" id="tagClear">clear</span>`;
+  tagbarEl.innerHTML=html;
+  tagbarEl.querySelectorAll(".t").forEach(el=>{
+    el.onclick=()=>{ const t=el.dataset.t; activeTags.has(t)?activeTags.delete(t):activeTags.add(t); renderTagBar(); renderList(); };
+  });
+  const clr=$("#tagClear"); if(clr) clr.onclick=()=>{ activeTags.clear(); renderTagBar(); renderList(); };
 }
 
 function renderList(){
@@ -379,6 +419,7 @@ function tagChips(item){
 function headBlock(item){
   const badges=(teamBadge(item)||attackBadges(item)) ? `<div class="badges">${teamBadge(item)}${attackBadges(item)}</div>` : "";
   return `<div class="head">
+      <button class="favbtn ${isFav(item.id)?'on':''}" id="favBtn" title="Pin to Favorites">${isFav(item.id)?'★':'☆'}</button>
       <div class="cat-tag">${esc(item.cat)}</div>
       <h2>${esc(item.title)}</h2>
       <div class="desc">${esc(item.desc)}</div>
@@ -386,6 +427,11 @@ function headBlock(item){
       ${badges}
       ${tagChips(item)}
     </div>`;
+}
+function wireFav(item){
+  const fb=$("#favBtn"); if(!fb) return;
+  fb.onclick=()=>{ toggleFav(item.id); if(!favorites.size && activeCat==="__fav") activeCat="All";
+    renderDetail(); renderRail(); renderList(); };
 }
 
 function renderDetail(){
@@ -441,6 +487,7 @@ function renderDetail(){
   $("#editBtn").onclick=()=>openModal(item.id);
   $("#copyBtn").onclick=()=>copyText(fillTemplate(raw, phValues), $("#copyBtn"));
   $("#dlBtn").onclick=()=>download(fname, fillTemplate(raw, phValues));
+  wireFav(item);
 }
 
 function renderToolDetail(item){
@@ -463,6 +510,7 @@ function renderToolDetail(item){
     ${item.install?`<div class="insthdr">Install</div>`:""}
     ${inst}`;
   detailEl.querySelectorAll(".inst-copy").forEach(b=>{ b.onclick=()=>copyText(b.dataset.cmd, b); });
+  wireFav(item);
 }
 
 /* ---------- clipboard (works from file://) ---------- */
@@ -710,7 +758,27 @@ async function tryReconnectFile(){
 $("#saveFileBtn").onclick = saveToFile;
 $("#loadFileBtn").onclick = loadFromFile;
 
+/* ---------- keyboard nav ---------- */
+document.addEventListener("keydown", e=>{
+  const tag=(e.target.tagName||"").toLowerCase();
+  const typing = tag==="input"||tag==="textarea"||tag==="select";
+  if(scrim.classList.contains("open")){ if(e.key==="Escape") closeModal(); return; }
+  if(e.key==="/" && !typing){ e.preventDefault(); $("#q").focus(); return; }
+  if(typing) return;
+  if(e.key==="ArrowDown" || e.key==="ArrowUp"){
+    e.preventDefault();
+    const vis=library.filter(matches); if(!vis.length) return;
+    let idx=vis.findIndex(i=>i.id===selectedId);
+    idx = e.key==="ArrowDown" ? Math.min(vis.length-1, idx+1) : Math.max(0, idx<0?0:idx-1);
+    select(vis[idx].id);
+    const el=listEl.querySelector(".item.on"); if(el) el.scrollIntoView({block:"nearest"});
+  } else if(e.key==="c"){
+    const b=$("#copyBtn"); if(b) b.click();
+  }
+});
+
 /* ---------- boot ---------- */
+loadFavorites();
 loadLocalCustoms();
 renderRail();
 renderList();
