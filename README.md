@@ -22,7 +22,14 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
 - **Interactive generators** — built-in widgets such as the **Crontab Generator**: pick a
   preset or set each field, get the cron expression, a plain-English summary, and a
   ready-to-paste `crontab` install line.
-- **Filters** — category rail, tag chips (AND), language, and full-text search.
+- **Filters** — category rail, **team filter** (blue / red / purple), language, full-text
+  search, and **context-aware tag chips** (the tag bar shows only the tags present in your
+  current view, so it never becomes a wall of 60 chips).
+- **Related / next steps** — entries can link to the logical follow-on tasks (e.g. triage
+  snapshot → hash processes → persistence sweep), so common workflows chain without leaving
+  the detail pane.
+- **Color themes** — Field Amber, Night Slate, Paper (light), High-Contrast, and Terminal
+  Green, remembered between sessions.
 - **Favorites**, keyboard nav (`/` search, ↑/↓ list, `c` copy), and one-click **Copy /
   Download** (works from `file://`).
 - **Add / Edit** entries in-app and sync them to a JSON file on the USB.

@@ -3039,6 +3039,7 @@ nmap -sV -p- {{TARGET:10.0.0.0/24}} -oA scan`
  desc:"Capture system, network, process, and session state to a timestamped folder before it changes.",
  danger:"Run elevated for full process/owner data. Writes a triage folder.",
  team:"blue", tags:["incident-response","triage"],
+ related:["ir-proc-suspicious","ir-proc-hash","ir-persistence-sweep"],
  code:{
   ps:`$o = "triage_" + $env:COMPUTERNAME + "_" + (Get-Date -f yyyyMMdd_HHmmss); New-Item -Type Directory $o | Out-Null
 systeminfo            > "$o/sysinfo.txt"
@@ -3062,6 +3063,7 @@ echo "Collected to $o"`
 {id:"ir-proc-suspicious", cat:"Incident Response & Live Triage", title:"Processes from suspicious paths",
  desc:"Flag running processes whose image lives in a user-writable/temp location (dropper indicator).",
  team:"blue", tags:["incident-response","triage","process"], attack:["T1036"],
+ related:["ir-proc-hash","ir-proc-netmap"],
  code:{
   ps:`Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -match 'Temp|AppData|ProgramData|Public' } |
   Select-Object ProcessId, Name, ExecutablePath, CommandLine`,
@@ -3073,6 +3075,7 @@ ls -l /proc/*/exe 2>/dev/null | grep -E 'deleted|/tmp/|/dev/shm/|/var/tmp/'`,
  desc:"SHA-256 every running executable to match against IOC / known-bad hash lists.",
  danger:"Run elevated to reach every process image.",
  team:"blue", tags:["incident-response","triage","process"],
+ related:["ir-proc-netmap","ir-persistence-sweep"],
  code:{
   ps:`Get-Process | Where-Object Path | Select-Object -Unique Path |
   ForEach-Object { [pscustomobject]@{ SHA256=(Get-FileHash $_.Path -Algorithm SHA256).Hash; Path=$_.Path } }`,
@@ -3082,6 +3085,7 @@ ls -l /proc/*/exe 2>/dev/null | grep -E 'deleted|/tmp/|/dev/shm/|/var/tmp/'`,
 {id:"ir-proc-netmap", cat:"Incident Response & Live Triage", title:"Connections mapped to processes",
  desc:"Established sessions with the owning PID, process name, and (where available) command line.",
  team:"blue", tags:["incident-response","triage","network"],
+ related:["ir-proc-suspicious","ir-persistence-sweep"],
  code:{
   ps:`Get-NetTCPConnection -State Established | ForEach-Object {
   $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
@@ -3094,6 +3098,7 @@ ls -l /proc/*/exe 2>/dev/null | grep -E 'deleted|/tmp/|/dev/shm/|/var/tmp/'`,
  desc:"One pass over the common autostart locations (run keys/services/tasks, or cron/systemd/launchd).",
  danger:"Run elevated to cover all users/system scope.",
  team:"blue", tags:["incident-response","persistence","triage"], attack:["T1547"],
+ related:["ir-proc-suspicious","ir-collect-triage"],
  code:{
   ps:`"== Run keys =="
 Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run','HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue

@@ -94,6 +94,10 @@ for (const e of LIB) {
     if (!Array.isArray(e.attack)) err(id, "attack must be an array");
     else e.attack.forEach(t => { if (!ATTACK_RE.test(t)) err(id, `invalid ATT&CK id "${t}"`); });
   }
+  if (e.related) {
+    if (!Array.isArray(e.related)) err(id, "related must be an array");
+    else if (e.related.includes(e.id)) err(id, "related must not reference itself");
+  }
 
   // purple-team rule: offensive entries must be paired with detection guidance
   if (e.team === "red" || e.team === "purple") {
@@ -101,6 +105,12 @@ for (const e of LIB) {
     if (!e.detect) err(id, "offensive entry must carry a detect line");
     if (!e.danger) warn(id, "offensive entry without a danger note");
   }
+}
+
+// related ids must reference entries that exist
+for (const e of LIB) {
+  if (e && e.related && Array.isArray(e.related))
+    e.related.forEach(r => { if (!seen.has(r)) err(e.id, `related id "${r}" not found`); });
 }
 
 console.log(`FieldKit validate — ${LIB.length} entries, ${Object.keys(cats).length} categories`);

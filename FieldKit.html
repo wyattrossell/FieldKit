@@ -12,6 +12,28 @@
     --mono:ui-monospace,"Cascadia Code","Cascadia Mono",Consolas,"SF Mono","DejaVu Sans Mono",monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
+  /* ---------- color theme presets (data-theme on <html>) ---------- */
+  :root[data-theme="slate"]{
+    --bg:#0f141a; --panel:#161c24; --panel2:#1c242e; --edge:#2a333f; --edge2:#38414f;
+    --ink:#e6ebf2; --muted:#8b96a5; --faint:#586474;
+    --amber:#5aa9e6; --amber-dim:#2f5f86; --teal:#57b6bd; --red:#e06b6b; --green:#6fbf8f;
+  }
+  :root[data-theme="paper"]{
+    color-scheme:light;
+    --bg:#f4f1ea; --panel:#ffffff; --panel2:#ece7dd; --edge:#d9d2c4; --edge2:#c4bdae;
+    --ink:#2a2620; --muted:#6b6456; --faint:#9a9384;
+    --amber:#b5791a; --amber-dim:#d9b877; --teal:#2f7d84; --red:#c2542f; --green:#4f7d3a;
+  }
+  :root[data-theme="contrast"]{
+    --bg:#000000; --panel:#0a0a0a; --panel2:#161616; --edge:#3a3a3a; --edge2:#585858;
+    --ink:#ffffff; --muted:#d4d4d4; --faint:#9a9a9a;
+    --amber:#ffb000; --amber-dim:#7a5400; --teal:#4fd0d9; --red:#ff6b4a; --green:#6fe07f;
+  }
+  :root[data-theme="green"]{
+    --bg:#0a0f0a; --panel:#0f160f; --panel2:#141d14; --edge:#1f2d1f; --edge2:#2c3f2c;
+    --ink:#c8e6c8; --muted:#7fae7f; --faint:#557555;
+    --amber:#5fe35f; --amber-dim:#2f7a2f; --teal:#57bda0; --red:#e0864f; --green:#7fd069;
+  }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{
@@ -49,6 +71,9 @@
   }
   .langfilter button:hover{color:var(--ink)}
   .langfilter button.on{background:var(--panel2); color:var(--amber); box-shadow:inset 0 0 0 1px var(--edge2)}
+  .teamfilter button{display:flex; align-items:center; gap:5px}
+  .teamfilter button .teamdot{margin:0}
+  select.toolbtn{appearance:auto; -webkit-appearance:auto}
   .toolbtn{
     font-family:var(--mono); font-size:11px; letter-spacing:.5px; color:var(--muted);
     background:var(--bg); border:1px solid var(--edge); padding:7px 11px; border-radius:6px; cursor:pointer;
@@ -122,6 +147,13 @@
   .inst-os{font-family:var(--mono); font-size:11px; color:var(--faint); flex:none; width:64px}
   .inst-cmd{font-family:var(--mono); font-size:12px; color:#dfe6ee; overflow-x:auto; white-space:pre; flex:1}
   .empty{padding:40px 20px; text-align:center; color:var(--faint); font-size:13px}
+  /* related / next-steps links in the detail pane */
+  .related{margin:2px 22px 24px}
+  .rel-h{font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--faint); margin-bottom:9px}
+  .rel-row{display:flex; gap:8px; flex-wrap:wrap}
+  .relbtn{font-family:var(--mono); font-size:12px; color:var(--teal); background:var(--panel); border:1px solid var(--edge); border-radius:6px; padding:8px 12px; cursor:pointer; text-align:left}
+  .relbtn:hover{border-color:var(--teal); color:var(--ink)}
+  .relbtn::before{content:"→ "; opacity:.55}
   /* widget: crontab generator */
   .cron-presets{display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:16px 22px 2px}
   .cron-lbl,.cron-out-lbl{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--faint)}
@@ -147,7 +179,8 @@
   .tagbar .t:hover{color:var(--ink)}
   .tagbar .t.on{color:var(--amber); border-color:var(--amber-dim); background:var(--panel2)}
   .tagbar .t .c{opacity:.5}
-  .tagbar .clear{font-family:var(--mono); font-size:10.5px; color:var(--faint); cursor:pointer; margin-left:4px; text-decoration:underline}
+  .tagbar .clear,.tagbar .more{font-family:var(--mono); font-size:10.5px; color:var(--faint); cursor:pointer; margin-left:4px; text-decoration:underline}
+  .tagbar .more:hover,.tagbar .clear:hover{color:var(--amber)}
   .detail .cat-tag{
     font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--teal);
   }
@@ -238,6 +271,19 @@
     <button data-l="linux">LINUX</button>
     <button data-l="py">PY</button>
   </div>
+  <div class="langfilter teamfilter" id="teamfilter" title="Filter by team">
+    <button data-tm="all" class="on">ALL</button>
+    <button data-tm="blue"><span class="teamdot blue"></span>BLUE</button>
+    <button data-tm="red"><span class="teamdot red"></span>RED</button>
+    <button data-tm="purple"><span class="teamdot purple"></span>PURPLE</button>
+  </div>
+  <select class="toolbtn" id="themeSel" title="Color theme">
+    <option value="amber">Field Amber</option>
+    <option value="slate">Night Slate</option>
+    <option value="paper">Paper (light)</option>
+    <option value="contrast">High Contrast</option>
+    <option value="green">Terminal Green</option>
+  </select>
   <button class="toolbtn" id="addBtn">+ Add</button>
   <button class="toolbtn" id="saveFileBtn" title="Save your custom commands to a JSON file on the USB stick. After linking, new additions auto-save to it.">Save file</button>
   <button class="toolbtn" id="loadFileBtn" title="Load custom commands from a JSON file — e.g. after plugging the USB into another PC.">Load file</button>
@@ -312,10 +358,27 @@ if (!window.FIELDKIT_LIBRARY) console.warn("FieldKit: .library-data.js not found
 let library = BUILTIN.map(x=>({...x}));
 let activeCat = "All";
 let activeLangFilter = "all";
+let activeTeam = "all";
 let query = "";
 let selectedId = null;
 let selectedLang = null;
 let activeTags = new Set();
+let tagsExpanded = false;
+const TAG_CAP = 20;
+
+const THEME_KEY = "fieldkit.theme.v1";
+const THEMES = ["amber","slate","paper","contrast","green"];
+function applyTheme(name){
+  if(!THEMES.includes(name)) name="amber";
+  document.documentElement.setAttribute("data-theme", name);
+  try{ localStorage.setItem(THEME_KEY, name); }catch(e){}
+}
+function loadTheme(){
+  let t="amber"; try{ t=localStorage.getItem(THEME_KEY)||"amber"; }catch(e){}
+  if(!THEMES.includes(t)) t="amber";
+  document.documentElement.setAttribute("data-theme", t);
+  const sel=document.querySelector("#themeSel"); if(sel) sel.value=t;
+}
 
 const FAV_KEY = "fieldkit.favorites.v1";
 let favorites = new Set();
@@ -331,10 +394,12 @@ function langsOf(item){ return item.code ? Object.keys(LANGS).filter(l=>item.cod
 function isWidget(item){ return !!item.widget; }
 function isTool(item){ return !item.widget && !item.code && !!(item.install || item.url); }
 
-function matches(item){
+function matchesBase(item, opts){
+  opts = opts || {};
   if(activeCat==="__fav"){ if(!favorites.has(item.id)) return false; }
   else if(activeCat!=="All" && item.cat!==activeCat) return false;
-  if(activeTags.size && !(item.tags && [...activeTags].every(t=>item.tags.includes(t)))) return false;
+  if(activeTeam!=="all" && item.team!==activeTeam) return false;
+  if(!opts.ignoreTags && activeTags.size && !(item.tags && [...activeTags].every(t=>item.tags.includes(t)))) return false;
   if(activeLangFilter!=="all" && !(item.code && item.code[activeLangFilter])) return false;
   if(query){
     const codeText = item.code ? Object.values(item.code).join(" ")
@@ -345,6 +410,7 @@ function matches(item){
   }
   return true;
 }
+function matches(item){ return matchesBase(item); }
 
 function renderRail(){
   const cats=[...new Set(library.map(i=>i.cat))];
@@ -365,17 +431,27 @@ function renderRail(){
 }
 
 function renderTagBar(){
+  // contextual: only tags present in items matching the OTHER active filters
+  const pool=library.filter(i=>matchesBase(i,{ignoreTags:true}));
   const universe={};
-  library.forEach(i=>(i.tags||[]).forEach(t=>universe[t]=(universe[t]||0)+1));
-  const tags=Object.keys(universe).sort();
+  pool.forEach(i=>(i.tags||[]).forEach(t=>universe[t]=(universe[t]||0)+1));
+  activeTags.forEach(t=>{ if(!(t in universe)) universe[t]=0; }); // keep active tags visible
+  const tags=Object.keys(universe).sort((a,b)=> (universe[b]-universe[a]) || a.localeCompare(b));
   if(!tags.length){ tagbarEl.innerHTML=""; return; }
+  const overflow = tags.length>TAG_CAP && !tagsExpanded;
+  const shown = overflow ? tags.slice(0,TAG_CAP) : tags.slice();
+  activeTags.forEach(t=>{ if(!shown.includes(t)) shown.push(t); }); // active tags always shown
   let html=`<span class="lbl">Tags</span>`;
-  html+=tags.map(t=>`<span class="t ${activeTags.has(t)?'on':''}" data-t="${esc(t)}">${esc(t)} <span class="c">${universe[t]}</span></span>`).join("");
+  html+=shown.map(t=>`<span class="t ${activeTags.has(t)?'on':''}" data-t="${esc(t)}">${esc(t)} <span class="c">${universe[t]}</span></span>`).join("");
+  if(overflow) html+=`<span class="more" id="tagMore">+${tags.length-TAG_CAP} more</span>`;
+  else if(tags.length>TAG_CAP) html+=`<span class="more" id="tagLess">show fewer</span>`;
   if(activeTags.size) html+=`<span class="clear" id="tagClear">clear</span>`;
   tagbarEl.innerHTML=html;
   tagbarEl.querySelectorAll(".t").forEach(el=>{
     el.onclick=()=>{ const t=el.dataset.t; activeTags.has(t)?activeTags.delete(t):activeTags.add(t); renderTagBar(); renderList(); };
   });
+  const more=$("#tagMore"); if(more) more.onclick=()=>{ tagsExpanded=true; renderTagBar(); };
+  const less=$("#tagLess"); if(less) less.onclick=()=>{ tagsExpanded=false; renderTagBar(); };
   const clr=$("#tagClear"); if(clr) clr.onclick=()=>{ activeTags.clear(); renderTagBar(); renderList(); };
 }
 
@@ -452,6 +528,18 @@ function wireFav(item){
   fb.onclick=()=>{ toggleFav(item.id); if(!favorites.size && activeCat==="__fav") activeCat="All";
     renderDetail(); renderRail(); renderList(); };
 }
+function relatedBlock(item){
+  if(!item.related || !item.related.length) return "";
+  const links=item.related.map(id=>{
+    const r=library.find(x=>x.id===id); if(!r) return "";
+    return `<button class="relbtn" data-rid="${esc(id)}">${esc(r.title)}</button>`;
+  }).filter(Boolean).join("");
+  if(!links) return "";
+  return `<div class="related"><div class="rel-h">Related / next steps</div><div class="rel-row">${links}</div></div>`;
+}
+function wireRelated(){
+  detailEl.querySelectorAll(".relbtn").forEach(b=>{ b.onclick=()=>select(b.dataset.rid); });
+}
 
 function renderDetail(){
   const item=library.find(i=>i.id===selectedId);
@@ -494,7 +582,8 @@ function renderDetail(){
       </div>
       <pre id="codeEl"></pre>
     </div>
-    ${dm}`;
+    ${dm}
+    ${relatedBlock(item)}`;
   const paint=()=>{ $("#codeEl").textContent=fillTemplate(raw, phValues); };
   paint();
   detailEl.querySelectorAll(".phf input").forEach(inp=>{
@@ -507,7 +596,7 @@ function renderDetail(){
   $("#editBtn").onclick=()=>openModal(item.id);
   $("#copyBtn").onclick=()=>copyText(fillTemplate(raw, phValues), $("#copyBtn"));
   $("#dlBtn").onclick=()=>download(fname, fillTemplate(raw, phValues));
-  wireFav(item);
+  wireFav(item); wireRelated();
 }
 
 function renderToolDetail(item){
@@ -528,9 +617,10 @@ function renderToolDetail(item){
       ${plats?`<span>Platforms: ${plats}</span>`:""}
     </div>
     ${item.install?`<div class="insthdr">Install</div>`:""}
-    ${inst}`;
+    ${inst}
+    ${relatedBlock(item)}`;
   detailEl.querySelectorAll(".inst-copy").forEach(b=>{ b.onclick=()=>copyText(b.dataset.cmd, b); });
-  wireFav(item);
+  wireFav(item); wireRelated();
 }
 
 /* ---------- interactive widgets ---------- */
@@ -602,7 +692,8 @@ function renderCronWidget(item){
       <span class="inst-os">add</span>
       <span class="inst-cmd" id="cronInstall"></span>
       <button class="act inst-copy" id="cronCopyInstall">Copy</button>
-    </div></div>`;
+    </div></div>
+    ${relatedBlock(item)}`;
   const paint=()=>{
     const expr=`${st.mi} ${st.ho} ${st.dom} ${st.mon} ${st.dow}`;
     $("#cronExpr").textContent=expr;
@@ -624,7 +715,7 @@ function renderCronWidget(item){
   });
   $("#cronCopyExpr").onclick=()=>copyText($("#cronExpr").textContent, $("#cronCopyExpr"));
   $("#cronCopyInstall").onclick=()=>copyText($("#cronInstall").textContent, $("#cronCopyInstall"));
-  wireFav(item);
+  wireFav(item); wireRelated();
 }
 
 /* ---------- clipboard (works from file://) ---------- */
@@ -735,16 +826,24 @@ $("#importFile").onchange=e=>{
 };
 
 /* ---------- filters ---------- */
-$("#q").oninput=e=>{ query=e.target.value.trim().toLowerCase(); renderList(); };
+$("#q").oninput=e=>{ query=e.target.value.trim().toLowerCase(); tagsExpanded=false; renderTagBar(); renderList(); };
 $("#langfilter").querySelectorAll("button").forEach(b=>{
   b.onclick=()=>{
     $("#langfilter").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
     b.classList.add("on"); activeLangFilter=b.dataset.l;
     if(selectedId){ const it=library.find(i=>i.id===selectedId);
-      if(activeLangFilter!=="all" && it.code[activeLangFilter]) selectedLang=activeLangFilter; }
-    renderList(); if(selectedId) renderDetail();
+      if(activeLangFilter!=="all" && it.code && it.code[activeLangFilter]) selectedLang=activeLangFilter; }
+    tagsExpanded=false; renderTagBar(); renderList(); if(selectedId) renderDetail();
   };
 });
+$("#teamfilter").querySelectorAll("button").forEach(b=>{
+  b.onclick=()=>{
+    $("#teamfilter").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); activeTeam=b.dataset.tm; tagsExpanded=false;
+    renderTagBar(); renderList();
+  };
+});
+$("#themeSel").onchange=e=>applyTheme(e.target.value);
 
 /* ---------- utils ---------- */
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -892,6 +991,7 @@ document.addEventListener("keydown", e=>{
 });
 
 /* ---------- boot ---------- */
+loadTheme();
 loadFavorites();
 loadLocalCustoms();
 renderRail();
