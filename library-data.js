@@ -3297,5 +3297,217 @@ sudo lsof -nP -iTCP | grep "$IP"   # note the PID, then: sudo kill -9 <PID>`
   ps:`Get-Clipboard`,
   mac:`pbpaste`,
   linux:`xclip -selection clipboard -o 2>/dev/null || wl-paste 2>/dev/null`
+ }},
+
+/* ================= DETECTION ENGINEERING ================= */
+{id:"det-yara-scan", cat:"Detection Engineering", title:"YARA: scan a path with a ruleset",
+ desc:"Recursively scan files for matches against a YARA ruleset. Requires yara.",
+ team:"blue", tags:["detection","yara","forensics"],
+ code:{
+  linux:`yara -r {{RULE:/opt/rules/malware.yar}} {{PATH:/home}}`,
+  mac:`yara -r {{RULE:/opt/rules/malware.yar}} {{PATH:/Users}}`
+ }},
+{id:"det-yara-rule", cat:"Detection Engineering", title:"YARA: write & run a rule",
+ desc:"Author a minimal YARA rule (PE header + suspicious strings) and scan with it.",
+ team:"blue", tags:["detection","yara"],
+ code:{
+  linux:`cat > sample.yar <<'EOF'
+rule suspicious_dropper
+{
+  strings:
+    $mz = { 4D 5A }                 // PE 'MZ' header
+    $s1 = "cmd.exe /c" ascii nocase
+    $s2 = "powershell -enc" ascii nocase
+  condition:
+    $mz at 0 and any of ($s*)
+}
+EOF
+yara -r sample.yar {{PATH:/tmp}}`,
+  mac:`cat > sample.yar <<'EOF'
+rule suspicious_dropper
+{
+  strings:
+    $mz = { 4D 5A }
+    $s1 = "cmd.exe /c" ascii nocase
+    $s2 = "powershell -enc" ascii nocase
+  condition:
+    $mz at 0 and any of ($s*)
+}
+EOF
+yara -r sample.yar {{PATH:/tmp}}`
+ }},
+{id:"det-yara-proc", cat:"Detection Engineering", title:"YARA: scan process memory",
+ desc:"Scan a running process's memory against a ruleset (Linux). Requires yara + root.",
+ danger:"Run elevated.",
+ team:"blue", tags:["detection","yara","memory"], attack:["T1055"],
+ code:{
+  linux:`sudo yara {{RULE:/opt/rules/malware.yar}} /proc/{{PID:1234}}/mem 2>/dev/null   # or: yara -p {{PID:1234}} rule.yar`
+ }},
+{id:"det-sigma-rule", cat:"Detection Engineering", title:"Sigma: a portable detection rule",
+ desc:"A Sigma rule (backend-agnostic YAML) — example: encoded PowerShell process creation.",
+ team:"blue", tags:["detection","sigma","logs"], attack:["T1059.001"],
+ code:{
+  linux:`cat > enc_powershell.yml <<'EOF'
+title: Encoded PowerShell Command
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  sel:
+    Image|endswith: '\\powershell.exe'
+    CommandLine|contains:
+      - ' -enc '
+      - ' -EncodedCommand '
+  condition: sel
+level: high
+EOF
+echo "Convert it to your SIEM with sigma-cli (see the next entry)."`
+ }},
+{id:"det-sigma-convert", cat:"Detection Engineering", title:"Sigma: convert to a SIEM query",
+ desc:"Translate a Sigma rule into your platform's query language. Requires sigma-cli (pip install sigma-cli).",
+ team:"blue", tags:["detection","sigma"],
+ code:{
+  linux:`sigma convert -t splunk {{RULE:enc_powershell.yml}}   # backends: splunk, esql, lucene, ...`,
+  mac:`sigma convert -t splunk {{RULE:enc_powershell.yml}}`
+ }},
+{id:"det-suricata-rule", cat:"Detection Engineering", title:"Suricata: write & test a signature",
+ desc:"Author a Suricata/Snort rule and run it against a pcap. Requires suricata.",
+ team:"blue", tags:["detection","suricata","network"],
+ code:{
+  linux:`cat > local.rules <<'EOF'
+alert http $HOME_NET any -> any any (msg:"Cleartext login POST"; flow:to_server; http.method; content:"POST"; http.uri; content:"/login"; sid:1000001; rev:1;)
+EOF
+suricata -r {{PCAP:traffic.pcap}} -S local.rules -l .
+cat fast.log`
+ }},
+{id:"det-suricata-run", cat:"Detection Engineering", title:"Suricata: run against a pcap",
+ desc:"Replay a capture through an existing ruleset and read the alerts. Requires suricata.",
+ team:"blue", tags:["detection","suricata","network"],
+ code:{
+  linux:`suricata -r {{PCAP:traffic.pcap}} -S {{RULES:/etc/suricata/rules/suricata.rules}} -l .
+tail -n 40 fast.log`
+ }},
+{id:"det-suricata-update", cat:"Detection Engineering", title:"Suricata: update ET rules",
+ desc:"Fetch/refresh Emerging Threats rules. Requires suricata-update.",
+ danger:"Writes rule files; run with appropriate privileges.",
+ team:"blue", tags:["detection","suricata"],
+ code:{
+  linux:`sudo suricata-update && sudo suricatasc -c reload-rules 2>/dev/null`
+ }},
+{id:"det-suricata-eve", cat:"Detection Engineering", title:"Suricata: summarize eve.json alerts",
+ desc:"Roll up alert signatures and talkers from Suricata's eve.json. Requires jq.",
+ team:"blue", tags:["detection","suricata","logs"],
+ code:{
+  linux:`jq -r 'select(.event_type=="alert") | "\\(.alert.signature)  \\(.src_ip) -> \\(.dest_ip)"' eve.json | sort | uniq -c | sort -rn | head`
+ }},
+{id:"det-zeek-pcap", cat:"Detection Engineering", title:"Zeek: analyze a pcap",
+ desc:"Generate Zeek logs from a capture and summarize connections. Requires zeek.",
+ team:"blue", tags:["detection","zeek","network"],
+ code:{
+  linux:`zeek -r {{PCAP:traffic.pcap}}
+cat conn.log | zeek-cut id.orig_h id.resp_h id.resp_p service | sort | uniq -c | sort -rn | head`,
+  mac:`zeek -r {{PCAP:traffic.pcap}}
+cat conn.log | zeek-cut id.orig_h id.resp_h id.resp_p service | sort | uniq -c | sort -rn | head`
+ }},
+{id:"det-zeek-live", cat:"Detection Engineering", title:"Zeek: run live on an interface",
+ desc:"Continuously produce Zeek logs from live traffic. Requires zeek + root.",
+ danger:"Captures traffic; run elevated. Authorized monitoring only.",
+ team:"blue", tags:["detection","zeek","network"],
+ code:{
+  linux:`sudo zeek -i {{IFACE:eth0}} -C`
+ }},
+{id:"det-zeek-iocs", cat:"Detection Engineering", title:"Zeek: extract DNS / HTTP IOCs",
+ desc:"Pull the top DNS queries and HTTP hosts from Zeek logs for review (zeek-cut).",
+ team:"blue", tags:["detection","zeek","dns"],
+ code:{
+  linux:`echo "== DNS =="; zeek-cut query < dns.log | sort | uniq -c | sort -rn | head
+echo "== HTTP hosts =="; zeek-cut host < http.log | sort | uniq -c | sort -rn | head`,
+  mac:`echo "== DNS =="; zeek-cut query < dns.log | sort | uniq -c | sort -rn | head
+echo "== HTTP hosts =="; zeek-cut host < http.log | sort | uniq -c | sort -rn | head`
+ }},
+{id:"det-osquery-run", cat:"Detection Engineering", title:"osquery: ad-hoc query",
+ desc:"Query the endpoint as a SQL database. Requires osquery (osqueryi). Cross-platform.",
+ team:"blue", tags:["detection","osquery"],
+ code:{
+  ps:`osqueryi "SELECT hostname, cpu_brand, physical_memory FROM system_info;"`,
+  linux:`osqueryi "SELECT hostname, cpu_brand, physical_memory FROM system_info;"`,
+  mac:`osqueryi "SELECT hostname, cpu_brand, physical_memory FROM system_info;"`
+ }},
+{id:"det-osquery-deleted-bin", cat:"Detection Engineering", title:"osquery: processes with no on-disk binary",
+ desc:"Running processes whose executable was deleted — a fileless / dropped-payload indicator.",
+ team:"blue", tags:["detection","osquery","process"], attack:["T1620"],
+ code:{
+  ps:`osqueryi "SELECT pid, name, path FROM processes WHERE on_disk = 0;"`,
+  linux:`osqueryi "SELECT pid, name, path FROM processes WHERE on_disk = 0;"`,
+  mac:`osqueryi "SELECT pid, name, path FROM processes WHERE on_disk = 0;"`
+ }},
+{id:"det-osquery-listening", cat:"Detection Engineering", title:"osquery: listening ports + process",
+ desc:"Join listening sockets to their owning process via osquery.",
+ team:"blue", tags:["detection","osquery","network"],
+ code:{
+  ps:`osqueryi "SELECT p.pid, p.name, l.address, l.port FROM listening_ports l JOIN processes p ON l.pid = p.pid;"`,
+  linux:`osqueryi "SELECT p.pid, p.name, l.address, l.port FROM listening_ports l JOIN processes p ON l.pid = p.pid;"`,
+  mac:`osqueryi "SELECT p.pid, p.name, l.address, l.port FROM listening_ports l JOIN processes p ON l.pid = p.pid;"`
+ }},
+{id:"det-osquery-autostart", cat:"Detection Engineering", title:"osquery: autostart / persistence",
+ desc:"Enumerate persistence points via osquery (startup items, scheduled tasks, crontab).",
+ team:"blue", tags:["detection","osquery","persistence"], attack:["T1547"],
+ code:{
+  ps:`osqueryi "SELECT name, path, source FROM startup_items;"
+osqueryi "SELECT name, action, path FROM scheduled_tasks;"`,
+  linux:`osqueryi "SELECT command, path, minute, hour FROM crontab;"`,
+  mac:`osqueryi "SELECT name, path, source FROM startup_items;"`
+ }},
+{id:"det-osquery-fim", cat:"Detection Engineering", title:"osquery: file hashes (integrity)",
+ desc:"Hash sensitive files with osquery for integrity monitoring / baselining.",
+ team:"blue", tags:["detection","osquery","forensics"],
+ code:{
+  linux:`osqueryi "SELECT path, sha256 FROM hash WHERE path IN ('/etc/passwd','/etc/hosts','/etc/ssh/sshd_config');"`,
+  mac:`osqueryi "SELECT path, sha256 FROM hash WHERE path IN ('/etc/passwd','/etc/hosts','/etc/ssh/sshd_config');"`
+ }},
+{id:"det-sysmon-install", cat:"Detection Engineering", title:"Sysmon: deploy with a config",
+ desc:"Install Sysmon for rich process/network/registry telemetry. Sysmon (Sysinternals) + a curated config (e.g. SwiftOnSecurity or olafhartong).",
+ danger:"Installs a kernel driver; run elevated. Test the config before wide deployment.",
+ team:"blue", tags:["detection","sysmon","logs"],
+ code:{
+  ps:`./Sysmon64.exe -accepteula -i {{CONFIG:sysmonconfig.xml}}
+# update the config later without reinstalling:
+./Sysmon64.exe -c {{CONFIG:sysmonconfig.xml}}`
+ }},
+{id:"det-sysmon-query", cat:"Detection Engineering", title:"Sysmon: query high-value events",
+ desc:"Pull recent Sysmon events by ID. Key IDs: 1 proc, 3 net, 7 image-load, 8 remote-thread, 11 file-create, 13 reg-set, 22 DNS.",
+ danger:"Requires administrator; Sysmon must be installed.",
+ team:"blue", tags:["detection","sysmon","logs"], attack:["T1059"],
+ code:{
+  ps:`Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Sysmon/Operational'; Id={{ID:1}}} -MaxEvents 20 |
+  Select-Object TimeCreated, Message`
+ }},
+{id:"det-4688-cmdline", cat:"Detection Engineering", title:"Windows: process creation w/ command line (4688)",
+ desc:"Enable command-line auditing, then hunt process-creation events. Native.",
+ danger:"Enabling audit policy requires administrator.",
+ team:"blue", tags:["detection","logs","process"], attack:["T1059"],
+ code:{
+  ps:`# one-time enable: auditpol /set /subcategory:"Process Creation" /success:enable
+#   plus 'Include command line in process creation events' (GPO/registry)
+Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4688} -MaxEvents 20 |
+  Select-Object TimeCreated, @{n='NewProcess';e={$_.Properties[5].Value}}, @{n='CommandLine';e={$_.Properties[8].Value}}`
+ }},
+{id:"det-powershell-scriptblock", cat:"Detection Engineering", title:"Windows: PowerShell script-block hunt (4104)",
+ desc:"Search PowerShell Operational logs for encoded/obfuscated script blocks. Script-block logging must be on.",
+ danger:"Requires administrator.",
+ team:"blue", tags:["detection","logs"], attack:["T1059.001"],
+ code:{
+  ps:`Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-PowerShell/Operational'; Id=4104} -MaxEvents 50 |
+  Where-Object { $_.Message -match 'FromBase64String|-enc|IEX|DownloadString|Invoke-Expression' } |
+  Select-Object TimeCreated, Message`
+ }},
+{id:"det-auditd-rule", cat:"Detection Engineering", title:"Linux: auditd watch",
+ desc:"Add auditd rules to watch a sensitive file and log every execve. Requires auditd.",
+ danger:"Modifies audit configuration; run elevated.",
+ team:"blue", tags:["detection","logs","linux"], attack:["T1053"],
+ code:{
+  linux:`sudo auditctl -w /etc/passwd -p wa -k passwd_changes
+sudo auditctl -a always,exit -F arch=b64 -S execve -k exec_log
+sudo ausearch -k exec_log | tail`
  }}
 ];
