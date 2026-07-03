@@ -1,13 +1,13 @@
 # Contributing to FieldKit
 
-Thanks for helping build FieldKit. Entries live in **`library-data.js`** (a plain
+Thanks for helping build FieldKit. Entries live in **`.library-data.js`** (a plain
 JavaScript file that sets `window.FIELDKIT_LIBRARY`). The app (`FieldKit.html`) is a
 single self-contained file with **no external/CDN dependencies** and must keep working
 offline from `file://`. Please don't add build steps, frameworks, or network calls.
 
 ## Add an entry
 
-1. Open `library-data.js` and add your object to the array, near others in its category.
+1. Open `.library-data.js` (a hidden dotfile) and add your object to the array, near others in its category.
 2. Give it a unique, `lowercase-hyphenated` `id` prefixed by area (`recon-…`, `ir-…`, `tool-…`).
 3. Run the validator: **`node validate.js`** — it must print `OK`.
 4. Open `FieldKit.html` in a browser and confirm your entry renders and copies correctly.

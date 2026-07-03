@@ -4,4 +4,4 @@
 # contributors but never ship in a download. (git archive honors these.)
 * export-ignore
 /FieldKit.html   -export-ignore
-/library-data.js -export-ignore
+/.library-data.js -export-ignore

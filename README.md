@@ -29,23 +29,27 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
 
 ## Offline usage
 
-Keep `FieldKit.html` **and `library-data.js` together** (the command library lives in the
+Keep `FieldKit.html` **and `.library-data.js` together** (the command library lives in the
 `.js`, loaded via `<script src>` so it works from `file://`, where a fetched `.json` would be
 blocked). Copy both to a USB drive and open the HTML in a browser. That's it.
+
+> **Note:** `.library-data.js` is a hidden file (leading dot). When copying FieldKit to a USB
+> drive or another folder, enable **“show hidden files”** in your file manager so it comes along —
+> without it the app opens but shows an empty library.
 
 ## Repository layout
 
 | File | Purpose |
 |---|---|
 | `FieldKit.html` | The app — UI, rendering, filters, editor. Self-contained, no dependencies. |
-| `library-data.js` | The command/tool library (`window.FIELDKIT_LIBRARY`). |
+| `.library-data.js` | The command/tool library (`window.FIELDKIT_LIBRARY`); hidden dotfile. |
 | `validate.js` | Schema + vocabulary validator (`node validate.js`); runs in CI. |
 | `CONTRIBUTING.md` | Entry schema and how to add one. |
 | `DISCLAIMER.md` | Authorized-use notice. |
 
 ## Contributing
 
-New entries go in `library-data.js`; run `node validate.js` (must print `OK`) and open the app
+New entries go in `.library-data.js`; run `node validate.js` (must print `OK`) and open the app
 to confirm it renders. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the schema, the
 purple-team content policy, and the macOS-vs-Linux correctness rules.
 
