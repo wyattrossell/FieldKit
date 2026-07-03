@@ -13,6 +13,7 @@ const LIB = global.window.FIELDKIT_LIBRARY;
 
 const CODE_KEYS    = ["ps", "cmd", "mac", "linux", "py", "dork", "sql"];
 const INSTALL_KEYS = ["cmd", "mac", "linux"];
+const WIDGETS      = ["cron"];
 const TEAMS        = ["blue", "red", "purple"];
 const PLATFORMS    = ["windows", "macos", "linux"];
 const ID_RE        = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -55,9 +56,12 @@ for (const e of LIB) {
   if (!e.title) err(id, "missing title");
   if (!e.desc)  err(id, "missing desc");
 
-  const isTool = !e.code && (e.install || e.url);
+  const isWidget = !!e.widget;
+  const isTool = !isWidget && !e.code && (e.install || e.url);
 
-  if (isTool) {
+  if (isWidget) {
+    if (!WIDGETS.includes(e.widget)) err(id, `unknown widget "${e.widget}"`);
+  } else if (isTool) {
     if (!e.url)     err(id, "tool entry missing url");
     if (!e.install || typeof e.install !== "object") err(id, "tool entry missing install");
     else {

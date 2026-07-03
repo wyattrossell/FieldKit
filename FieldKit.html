@@ -89,6 +89,7 @@
   .chip.dork{color:#e0a35c; border-color:#6b4a2c}
   .chip.sql{color:#6fb7c9; border-color:#2f5a66}
   .chip.tool{color:#e3a83f; border-color:#6b5220}
+  .chip.gen{color:var(--teal); border-color:#2f5a5f}
   .teamdot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle}
   .teamdot.red{background:#d9744f} .teamdot.blue{background:#4f96d9} .teamdot.purple{background:#a86fd0}
   /* extended-schema detail: team / attack / tags / detect-mitigate / placeholders / tools */
@@ -121,6 +122,18 @@
   .inst-os{font-family:var(--mono); font-size:11px; color:var(--faint); flex:none; width:64px}
   .inst-cmd{font-family:var(--mono); font-size:12px; color:#dfe6ee; overflow-x:auto; white-space:pre; flex:1}
   .empty{padding:40px 20px; text-align:center; color:var(--faint); font-size:13px}
+  /* widget: crontab generator */
+  .cron-presets{display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:16px 22px 2px}
+  .cron-lbl,.cron-out-lbl{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--faint)}
+  .cron-preset{font-family:var(--mono); font-size:11px; color:var(--muted); background:var(--bg); border:1px solid var(--edge); border-radius:14px; padding:5px 11px; cursor:pointer}
+  .cron-preset:hover{color:var(--amber); border-color:var(--amber-dim)}
+  .cron-hint{color:var(--faint); text-transform:none; letter-spacing:0; font-size:9px}
+  .cron-fields .phf input{min-width:92px}
+  .cron-cmd{flex:1} .cron-cmd input{width:100%; min-width:0}
+  .cron-out{margin:14px 22px 4px; border:1px solid var(--edge); border-radius:6px; background:var(--panel2); overflow:hidden}
+  .cron-expr-row{display:flex; align-items:center; gap:12px; padding:11px 14px; background:var(--panel); border-bottom:1px solid var(--edge)}
+  .cron-expr{flex:1; font-family:var(--mono); font-size:16px; letter-spacing:1.5px; color:var(--amber); overflow-x:auto; white-space:pre}
+  .cron-desc{padding:11px 14px; color:var(--muted); font-size:13px}
   /* detail */
   .detail{overflow-y:auto; background:var(--bg); display:flex; flex-direction:column}
   .detail .head{padding:18px 22px 14px; border-bottom:1px solid var(--edge); position:relative}
@@ -315,7 +328,8 @@ const $ = s => document.querySelector(s);
 const railEl=$("#rail"), listEl=$("#list"), detailEl=$("#detail"), tagbarEl=$("#tagbar");
 
 function langsOf(item){ return item.code ? Object.keys(LANGS).filter(l=>item.code[l]) : []; }
-function isTool(item){ return !item.code && !!(item.install || item.url); }
+function isWidget(item){ return !!item.widget; }
+function isTool(item){ return !item.widget && !item.code && !!(item.install || item.url); }
 
 function matches(item){
   if(activeCat==="__fav"){ if(!favorites.has(item.id)) return false; }
@@ -372,7 +386,9 @@ function renderList(){
     return;
   }
   listEl.innerHTML=items.map(i=>{
-    const chips = isTool(i)
+    const chips = isWidget(i)
+      ? `<span class="chip gen">GEN</span>`
+      : isTool(i)
       ? `<span class="chip tool">TOOL</span>`
       : langsOf(i).map(l=>`<span class="chip ${l}">${LANGS[l].tag}</span>`).join("");
     const team = i.team ? `<span class="teamdot ${i.team}" title="${esc(i.team)} team"></span>` : "";
@@ -440,6 +456,7 @@ function wireFav(item){
 function renderDetail(){
   const item=library.find(i=>i.id===selectedId);
   if(!item){ return; }
+  if(isWidget(item)) return renderWidgetDetail(item);
   if(isTool(item)) return renderToolDetail(item);
   const avail=langsOf(item);
   const CORE=['ps','cmd','mac','linux','py'];
@@ -513,6 +530,100 @@ function renderToolDetail(item){
     ${item.install?`<div class="insthdr">Install</div>`:""}
     ${inst}`;
   detailEl.querySelectorAll(".inst-copy").forEach(b=>{ b.onclick=()=>copyText(b.dataset.cmd, b); });
+  wireFav(item);
+}
+
+/* ---------- interactive widgets ---------- */
+function renderWidgetDetail(item){
+  if(item.widget==="cron") return renderCronWidget(item);
+  detailEl.innerHTML=headBlock(item)+`<div class="empty">Unknown widget "${esc(item.widget)}".</div>`;
+  wireFav(item);
+}
+
+function cronDescribe(mi,ho,dom,mon,dow){
+  const isInt=s=>/^\d+$/.test(s), step=s=>/^\*\/(\d+)$/.exec(s), pad=n=>String(n).padStart(2,"0");
+  const MON=["","January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DOW={0:"Sunday",1:"Monday",2:"Tuesday",3:"Wednesday",4:"Thursday",5:"Friday",6:"Saturday",7:"Sunday"};
+  let time, clock=false;
+  if(isInt(mi)&&isInt(ho))       { time=`at ${pad(+ho)}:${pad(+mi)}`; clock=true; }
+  else if(mi==="*"&&ho==="*")     time="every minute";
+  else if(step(mi)&&ho==="*")     time=`every ${step(mi)[1]} minutes`;
+  else if(isInt(mi)&&ho==="*")    time=`at minute ${+mi} of every hour`;
+  else if((mi==="0"||isInt(mi))&&step(ho)) time=`every ${step(ho)[1]} hours${isInt(mi)?` at minute ${+mi}`:""}`;
+  else                            time=`minute ${mi}, hour ${ho}`;
+  const days=[];
+  if(dow!=="*") days.push(isInt(dow)?`on ${DOW[+dow]||dow}`:`on weekdays ${dow}`);
+  if(dom!=="*") days.push(isInt(dom)?`on the ${+dom}${(+dom%10===1&&+dom!==11)?"st":(+dom%10===2&&+dom!==12)?"nd":(+dom%10===3&&+dom!==13)?"rd":"th"}`:`on day-of-month ${dom}`);
+  if(mon!=="*") days.push(isInt(mon)?`in ${MON[+mon]||mon}`:`in month ${mon}`);
+  const allDates = dom==="*"&&dow==="*"&&mon==="*";
+  const scope = days.length ? " "+days.join(", ") : (clock&&allDates ? " every day" : "");
+  return (time+scope).replace(/\s+/g," ").trim();
+}
+
+function renderCronWidget(item){
+  const FIELDS=[
+    {k:"mi", label:"Minute",       hint:"0-59"},
+    {k:"ho", label:"Hour",         hint:"0-23"},
+    {k:"dom",label:"Day of month", hint:"1-31"},
+    {k:"mon",label:"Month",        hint:"1-12"},
+    {k:"dow",label:"Day of week",  hint:"0-6, Sun=0"},
+  ];
+  const PRESETS=[
+    {name:"Every minute",   v:["*","*","*","*","*"]},
+    {name:"Every 5 min",    v:["*/5","*","*","*","*"]},
+    {name:"Every 15 min",   v:["*/15","*","*","*","*"]},
+    {name:"Hourly",         v:["0","*","*","*","*"]},
+    {name:"Daily 02:30",    v:["30","2","*","*","*"]},
+    {name:"Weekdays 09:00", v:["0","9","*","*","1-5"]},
+    {name:"Weekly (Sun)",   v:["0","0","*","*","0"]},
+    {name:"Monthly (1st)",  v:["0","0","1","*","*"]},
+  ];
+  const st={mi:"0", ho:"2", dom:"*", mon:"*", dow:"*", cmd:"/path/to/script.sh"};
+  const presetBtns=PRESETS.map((p,i)=>`<button class="cron-preset" data-i="${i}">${esc(p.name)}</button>`).join("");
+  const fieldInputs=FIELDS.map(f=>
+    `<div class="phf"><label>${esc(f.label)} <span class="cron-hint">${esc(f.hint)}</span></label>
+     <input class="cron-in" data-k="${f.k}" value="${esc(st[f.k])}" spellcheck="false" autocomplete="off"></div>`).join("");
+  detailEl.innerHTML=`
+    ${headBlock(item)}
+    <div class="cron-presets"><span class="cron-lbl">Presets</span>${presetBtns}</div>
+    <div class="phbar cron-fields">${fieldInputs}</div>
+    <div class="phbar"><div class="phf cron-cmd"><label>Command</label>
+      <input class="cron-in" data-k="cmd" value="${esc(st.cmd)}" spellcheck="false" autocomplete="off"></div></div>
+    <div class="cron-out">
+      <div class="cron-expr-row">
+        <span class="cron-out-lbl">Cron</span>
+        <code class="cron-expr" id="cronExpr"></code>
+        <button class="act" id="cronCopyExpr">Copy</button>
+      </div>
+      <div class="cron-desc" id="cronDesc"></div>
+    </div>
+    <div class="insthdr">Install (mac / linux)</div>
+    <div class="inst"><div class="inst-row">
+      <span class="inst-os">add</span>
+      <span class="inst-cmd" id="cronInstall"></span>
+      <button class="act inst-copy" id="cronCopyInstall">Copy</button>
+    </div></div>`;
+  const paint=()=>{
+    const expr=`${st.mi} ${st.ho} ${st.dom} ${st.mon} ${st.dow}`;
+    $("#cronExpr").textContent=expr;
+    $("#cronDesc").textContent=cronDescribe(st.mi,st.ho,st.dom,st.mon,st.dow);
+    const line=`${expr} ${st.cmd}`.trim();
+    $("#cronInstall").textContent=`(crontab -l 2>/dev/null; echo "${line}") | crontab -`;
+  };
+  paint();
+  detailEl.querySelectorAll(".cron-in").forEach(inp=>{
+    inp.oninput=()=>{ const k=inp.dataset.k; st[k]= k==="cmd" ? inp.value : (inp.value.trim()||"*"); paint(); };
+  });
+  detailEl.querySelectorAll(".cron-preset").forEach(b=>{
+    b.onclick=()=>{
+      const p=PRESETS[+b.dataset.i];
+      ["mi","ho","dom","mon","dow"].forEach((k,i)=>st[k]=p.v[i]);
+      detailEl.querySelectorAll(".cron-in").forEach(inp=>{ if(inp.dataset.k!=="cmd") inp.value=st[inp.dataset.k]; });
+      paint();
+    };
+  });
+  $("#cronCopyExpr").onclick=()=>copyText($("#cronExpr").textContent, $("#cronCopyExpr"));
+  $("#cronCopyInstall").onclick=()=>copyText($("#cronInstall").textContent, $("#cronCopyInstall"));
   wireFav(item);
 }
 

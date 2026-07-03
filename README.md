@@ -17,7 +17,11 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
 - **Purple-team format:** offensive entries are paired with a MITRE **ATT&CK** id, a
   **Detect** line, and a **Mitigate** line — so defenders can recognize the same activity.
 - **Placeholders** — editable `{{TARGET:10.0.0.0/24}}` fields fill live into Copy/Download.
-- **Tools catalog** — official link, license, platforms, and per-OS install one-liners.
+- **Tools catalog** — official link, license, platforms, and per-OS install one-liners (AV/EDR
+  like ClamAV & Malwarebytes, ransomware decryptors, forensics/RE suites, remote-access tools, and more).
+- **Interactive generators** — built-in widgets such as the **Crontab Generator**: pick a
+  preset or set each field, get the cron expression, a plain-English summary, and a
+  ready-to-paste `crontab` install line.
 - **Filters** — category rail, tag chips (AND), language, and full-text search.
 - **Favorites**, keyboard nav (`/` search, ↑/↓ list, `c` copy), and one-click **Copy /
   Download** (works from `file://`).
