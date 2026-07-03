@@ -277,9 +277,51 @@
     select#catSel{display:inline-block}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  /* ---------- print / PDF: clean one-command field reference ---------- */
+  .printonly{display:none}
+  @media print{
+    @page{ margin:1.6cm; }
+    html,body{ height:auto; overflow:visible; background:#fff; color:#000; }
+    body{ display:block; font-family:var(--sans); font-size:11pt; }
+    header, footer, .tagbar, .rail, .list, .scrim,
+    .tabs, .acts, .favbtn, .cron-presets, .placeholder, .inst-copy{ display:none !important; }
+    main{ display:block; height:auto; min-height:0; }
+    .detail{ display:block; overflow:visible; background:#fff; }
+    .detail .head{ border:0; padding:0 0 10pt; }
+    .detail .cat-tag{ color:#000; letter-spacing:2px; }
+    .detail h2{ color:#000; font-size:19pt; margin:4pt 0; }
+    .detail .desc{ color:#000; max-width:none; font-size:11pt; }
+    .warn{ background:#fff; border:1px solid #000; color:#000; }
+    .badges, .tagrow{ margin-top:8pt; }
+    .team, .tag, a.att{ color:#000; border-color:#888; background:#fff; }
+    .phbar{ display:flex !important; gap:8pt; padding:0 0 4pt; }
+    .phf input{ border:1px solid #888; color:#000; background:#fff; }
+    .codewrap{ border:1px solid #888; background:#fff; margin:8pt 0 12pt; break-inside:avoid; }
+    .codebar{ background:#eee; border-color:#888; }
+    .codebar .fname{ color:#000; }
+    pre{ color:#000; white-space:pre-wrap; overflow-wrap:anywhere; font-size:9.5pt; line-height:1.5; }
+    .dm{ margin:0 0 12pt; }
+    .dm-row{ background:#fff; border:1px solid #888; color:#000; break-inside:avoid; }
+    .dm-k.detect, .dm-k.mitigate{ color:#000; }
+    .toolmeta{ color:#000; padding:0 0 8pt; }
+    .toolmeta a.site{ color:#000; border:1px solid #888; }
+    .toolmeta a.site::after{ content:" — " attr(href); font-size:9pt; }
+    .insthdr{ color:#000; padding:0 0 6pt; }
+    .inst{ margin:0 0 12pt; border-color:#888; }
+    .inst-row{ background:#fff; border-color:#888; }
+    .inst-os, .inst-cmd{ color:#000; }
+    .related{ margin:4pt 0 12pt; break-inside:avoid; }
+    .rel-h{ color:#000; }
+    .relbtn{ display:inline-block; color:#000; background:#fff; border:0; padding:1pt 0; margin:0 12pt 2pt 0; font-size:10pt; }
+    .relbtn::before{ content:"\2192  "; }
+    .printonly{ display:block; }
+    .printhead{ font-family:var(--mono); font-weight:700; letter-spacing:2px; color:#000; border-bottom:2px solid #000; padding-bottom:6pt; margin-bottom:12pt; font-size:12pt; }
+    .printfoot{ margin-top:16pt; padding-top:6pt; border-top:1px solid #888; color:#000; font-size:8.5pt; }
+  }
 </style>
 </head>
 <body>
+<div class="printonly printhead">FIELDKIT — field reference</div>
 <header>
   <div class="brand">
     <span class="mark">FIELDKIT</span>
@@ -327,6 +369,7 @@
 </main>
 
 <footer class="foot">⚠ Authorized use &amp; education only — you are responsible for legal compliance.</footer>
+<div class="printonly printfoot">Printed from FieldKit — an offline command reference. ⚠ Authorized use &amp; education only; you are responsible for legal compliance. Verify commands before running.</div>
 
 <!-- add modal -->
 <div class="scrim" id="scrim">

@@ -38,6 +38,9 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
 - **Bookmarkable** — the URL updates to `#entry-id` as you browse, so any command can be
   linked or bookmarked and reopens on load. Works on mobile too (a category selector replaces
   the rail on narrow screens).
+- **Printable** — `Ctrl-P` (or Save as PDF) on any open entry produces a clean black-on-white
+  one-page reference: title, category, description, danger note, team/ATT&CK, the command (or
+  install lines), Detect/Mitigate, and related next-steps — all app chrome stripped out.
 - **Add / Edit** entries in-app and sync them to a JSON file on the USB.
 
 ## Offline usage
