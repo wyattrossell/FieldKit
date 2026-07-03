@@ -1,0 +1,22 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate library data
+        run: node validate.js
+      - name: Syntax-check app and data
+        run: |
+          node --check library-data.js
+          awk '/^<script>$/{f=1;next} /^<\/script>/{f=0} f' FieldKit.html > /tmp/app.js
+          node --check /tmp/app.js
