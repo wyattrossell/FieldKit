@@ -85,6 +85,8 @@
   .chip.mac{color:#c9d1d9; border-color:#4a545f}
   .chip.linux{color:#7fc99a; border-color:#365a44}
   .chip.py{color:#e8cf6b; border-color:#6b5f2c}
+  .chip.dork{color:#e0a35c; border-color:#6b4a2c}
+  .chip.sql{color:#6fb7c9; border-color:#2f5a66}
   .empty{padding:40px 20px; text-align:center; color:var(--faint); font-size:13px}
   /* detail */
   .detail{overflow-y:auto; background:var(--bg); display:flex; flex-direction:column}
@@ -141,6 +143,8 @@
     color:var(--ink); font-family:var(--mono); font-size:13px; padding:9px 11px; outline:none;
   }
   .field textarea{min-height:150px; resize:vertical; line-height:1.6}
+  .field textarea.codeinput{min-height:64px}
+  .modal p.sub.codehdr{margin:16px 0 6px; color:var(--muted)}
   .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--amber-dim)}
   .modal .row{display:flex; gap:10px; justify-content:flex-end; margin-top:6px}
   .btn{font-family:var(--mono); font-size:12px; padding:9px 16px; border-radius:6px; cursor:pointer; border:1px solid var(--edge)}
@@ -178,8 +182,10 @@
     <button data-l="py">PY</button>
   </div>
   <button class="toolbtn" id="addBtn">+ Add</button>
-  <button class="toolbtn" id="exportBtn">Export</button>
-  <button class="toolbtn" id="importBtn">Import</button>
+  <button class="toolbtn" id="saveFileBtn" title="Save your custom commands to a JSON file on the USB stick. After linking, new additions auto-save to it.">Save file</button>
+  <button class="toolbtn" id="loadFileBtn" title="Load custom commands from a JSON file — e.g. after plugging the USB into another PC.">Load file</button>
+  <button class="toolbtn" id="exportBtn" title="Download the whole library as JSON">Export</button>
+  <button class="toolbtn" id="importBtn" title="Import a library JSON file">Import</button>
   <input type="file" id="importFile" accept="application/json" style="display:none">
 </header>
 
@@ -197,24 +203,24 @@
 <!-- add modal -->
 <div class="scrim" id="scrim">
   <div class="modal">
-    <h3>Add a snippet</h3>
-    <p class="sub">Stored for this session. Use Export to save your library back to the drive as a JSON file.</p>
+    <h3 id="m-heading">Add a snippet</h3>
+    <p class="sub">Auto-saved on this computer. Use <b>Save file</b> to keep them on the USB stick so they travel to other PCs (<b>Load file</b> there).</p>
     <div class="field"><label>Task name</label><input id="m-title" placeholder="Reset a stuck print spooler"></div>
     <div class="field"><label>Category</label><input id="m-cat" list="catlist" placeholder="Maintenance"><datalist id="catlist"></datalist></div>
     <div class="field"><label>Description</label><input id="m-desc" placeholder="Short line describing what it does"></div>
-    <div class="field"><label>Language</label>
-      <select id="m-lang">
-        <option value="ps">PowerShell (.ps1)</option>
-        <option value="cmd">Batch / CMD (.bat)</option>
-        <option value="mac">macOS (.command)</option>
-        <option value="linux">Linux (.sh)</option>
-        <option value="py">Python (.py)</option>
-      </select>
-    </div>
-    <div class="field"><label>Code</label><textarea id="m-code" spellcheck="false" placeholder="Paste your script here"></textarea></div>
+    <div class="field"><label>Warning (optional)</label><input id="m-danger" placeholder="Only if it writes, deletes, kills, or needs admin"></div>
+    <p class="sub codehdr">Code — fill in every OS you want this to run on; leave the rest blank.</p>
+    <div class="field"><label>PowerShell &middot; ps1</label><textarea id="code-ps" class="codeinput" spellcheck="false" placeholder="# PowerShell"></textarea></div>
+    <div class="field"><label>Windows CMD &middot; bat</label><textarea id="code-cmd" class="codeinput" spellcheck="false" placeholder=":: CMD / batch"></textarea></div>
+    <div class="field"><label>macOS &middot; command (BSD userland)</label><textarea id="code-mac" class="codeinput" spellcheck="false" placeholder="# macOS / zsh, BSD tools"></textarea></div>
+    <div class="field"><label>Linux &middot; sh (GNU userland)</label><textarea id="code-linux" class="codeinput" spellcheck="false" placeholder="# Linux / bash, GNU tools"></textarea></div>
+    <div class="field"><label>Python &middot; py</label><textarea id="code-py" class="codeinput" spellcheck="false" placeholder="# Python 3"></textarea></div>
+    <div class="field"><label>Google search / dork &middot; txt</label><textarea id="code-dork" class="codeinput" spellcheck="false" placeholder='site:example.com filetype:pdf "index of"'></textarea></div>
+    <div class="field"><label>SQL &middot; sql</label><textarea id="code-sql" class="codeinput" spellcheck="false" placeholder="SELECT * FROM t;"></textarea></div>
     <div class="row">
+      <button class="btn ghost" id="m-delete" style="margin-right:auto; display:none">Delete</button>
       <button class="btn ghost" id="m-cancel">Cancel</button>
-      <button class="btn primary" id="m-save">Save snippet</button>
+      <button class="btn primary" id="m-save">Save</button>
     </div>
   </div>
 </div>
@@ -230,7 +236,9 @@ const LANGS = {
   cmd:   {name:"Batch/CMD",  ext:"bat",     cmt:":: ", tag:"CMD"},
   mac:   {name:"macOS",      ext:"command", cmt:"# ",  tag:"MAC"},
   linux: {name:"Linux",      ext:"sh",      cmt:"# ",  tag:"LNX"},
-  py:    {name:"Python",     ext:"py",      cmt:"# ",  tag:"PY"}
+  py:    {name:"Python",     ext:"py",      cmt:"# ",  tag:"PY"},
+  dork:  {name:"Google",     ext:"txt",     cmt:"# ",  tag:"DORK"},
+  sql:   {name:"SQL",        ext:"sql",     cmt:"-- ", tag:"SQL"}
 };
 
 const BUILTIN = [
@@ -2663,7 +2671,270 @@ print([c.upper() for c in "abc"])             # ['A', 'B', 'C']`}},
 ages = [42, 30, 25]
 for name, age in zip(names, ages):     # pair them up
     print(name, age)
-print(dict(zip(names, ages)))          # {'Sam': 42, 'Ana': 30, 'Kim': 25}`}}
+print(dict(zip(names, ages)))          # {'Sam': 42, 'Ana': 30, 'Kim': 25}`}},
+
+/* ================= GOOGLE DORKS ================= */
+
+{id:"dork-inurl", cat:"Google Dorks", title:"inurl:", desc:"Require a term to appear in the page's URL — good for admin paths, login portals, and specific directories.",
+ code:{dork:`inurl:admin login portal`}},
+{id:"dork-site", cat:"Google Dorks", title:"site:", desc:"Limit results to a single domain or TLD.",
+ code:{dork:`site:microsoft.com windows xp end of life`}},
+{id:"dork-filetype", cat:"Google Dorks", title:"filetype: / ext:", desc:"Return only one file type. filetype: and ext: behave the same.",
+ code:{dork:`filetype:pdf nasa moon landing`}},
+{id:"dork-allinurl", cat:"Google Dorks", title:"allinurl:", desc:"Require every following word to appear in the URL (like stacking inurl:).",
+ code:{dork:`allinurl:blog wordpress admin`}},
+{id:"dork-intext", cat:"Google Dorks", title:"intext: / allintext:", desc:"Match words in the page body; allintext: requires all of the listed words.",
+ code:{dork:`intext:"index of /htdocs" patient records`}},
+{id:"dork-related", cat:"Google Dorks", title:"related:", desc:"Find sites similar to a given domain. Google's coverage of this operator is now limited.",
+ code:{dork:`related:sans.org`}},
+{id:"dork-info", cat:"Google Dorks", title:"info:", desc:"Once showed what Google indexed about a URL. Note: Google retired info: (~2019) and cache: (2024) — use the Wayback Machine (web.archive.org) for cached copies.",
+ code:{dork:`info:usgs.gov`}},
+{id:"dork-link", cat:"Google Dorks", title:"link:", desc:"Historically listed pages linking to a URL. Note: Google removed the link: operator (~2017); use Search Console or a backlink tool instead.",
+ code:{dork:`link:example.com/report.pdf`}},
+{id:"dork-exact", cat:"Google Dorks", title:`"exact phrase"`, desc:"Double quotes match a phrase verbatim and in order.",
+ code:{dork:`"malware hunting"`}},
+{id:"dork-plus", cat:"Google Dorks", title:"+word (force exact)", desc:"Force a term with no synonyms or stemming. Google removed the + operator in 2011 — quote the single word instead.",
+ code:{dork:`malware "hunter"`}},
+{id:"dork-exclude", cat:"Google Dorks", title:"-word (exclude)", desc:"A leading minus drops results (or query terms) containing that word. No space between - and the word.",
+ code:{dork:`advanced malware hunting -beginner -introduction`}},
+{id:"dork-wildcard", cat:"Google Dorks", title:`"word * word"`, desc:"Inside a quoted phrase, * is a single-word wildcard — matches anything between the two words.",
+ code:{dork:`"next * firewalls"`}},
+{id:"dork-or", cat:"Google Dorks", title:"OR / |", desc:"Match either term. Use uppercase OR or the pipe character | between terms.",
+ code:{dork:`locky OR ransomware`}},
+{id:"dork-and", cat:"Google Dorks", title:"AND", desc:"Match both terms. Google already ANDs separate words by default; explicit AND also works. The & character is not a Google operator.",
+ code:{dork:`cissp AND certification`}},
+{id:"dork-combo", cat:"Google Dorks", title:"Chaining operators (power search)", desc:"Stack operators for precise OSINT — e.g. surface exposed spreadsheets on a domain. Use only against systems you are authorized to assess.",
+ code:{dork:`intitle:"index of" (xls | xlsx) intext:budget site:example.com`}},
+
+/* ================= SQL ================= */
+
+/* ---------- querying a table ---------- */
+{id:"sql-select-cols", cat:"SQL", title:"SELECT columns", desc:"Return only the named columns from a table.",
+ code:{sql:`SELECT c1, c2 FROM t;`}},
+{id:"sql-select-all", cat:"SQL", title:"SELECT * (all columns)", desc:"Return every column and row; * means all columns.",
+ code:{sql:`SELECT * FROM t;`}},
+{id:"sql-where", cat:"SQL", title:"WHERE (filter rows)", desc:"Keep only rows that satisfy a condition.",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE condition;`}},
+{id:"sql-distinct", cat:"SQL", title:"SELECT DISTINCT", desc:"Drop duplicate rows from the result set.",
+ code:{sql:`SELECT DISTINCT c1 FROM t
+WHERE condition;`}},
+{id:"sql-orderby", cat:"SQL", title:"ORDER BY", desc:"Sort the result set; ASC is the default, DESC reverses it (per column).",
+ code:{sql:`SELECT c1, c2 FROM t
+ORDER BY c1 ASC;   -- or DESC`}},
+{id:"sql-limit", cat:"SQL", title:"LIMIT / OFFSET", desc:"Skip offset rows then return the next n. LIMIT/OFFSET is MySQL/PostgreSQL/SQLite; SQL Server & Oracle use OFFSET ... FETCH.",
+ code:{sql:`SELECT c1, c2 FROM t
+ORDER BY c1
+LIMIT n OFFSET offset;`}},
+{id:"sql-groupby", cat:"SQL", title:"GROUP BY (aggregate)", desc:"Collapse rows into groups and apply an aggregate (COUNT, SUM, ...) per group.",
+ code:{sql:`SELECT c1, aggregate(c2)
+FROM t
+GROUP BY c1;`}},
+{id:"sql-having", cat:"SQL", title:"HAVING (filter groups)", desc:"Filter groups after aggregation. WHERE filters rows; HAVING filters groups.",
+ code:{sql:`SELECT c1, aggregate(c2)
+FROM t
+GROUP BY c1
+HAVING condition;`}},
+
+/* ---------- joining tables ---------- */
+{id:"sql-inner-join", cat:"SQL", title:"INNER JOIN", desc:"Rows that have a match in both tables.",
+ code:{sql:`SELECT c1, c2
+FROM t1
+INNER JOIN t2 ON condition;`}},
+{id:"sql-left-join", cat:"SQL", title:"LEFT JOIN", desc:"All rows from the left table, plus matches from the right (NULLs where none).",
+ code:{sql:`SELECT c1, c2
+FROM t1
+LEFT JOIN t2 ON condition;`}},
+{id:"sql-right-join", cat:"SQL", title:"RIGHT JOIN", desc:"All rows from the right table, plus matches from the left.",
+ code:{sql:`SELECT c1, c2
+FROM t1
+RIGHT JOIN t2 ON condition;`}},
+{id:"sql-full-join", cat:"SQL", title:"FULL OUTER JOIN", desc:"All rows from both tables, matched where possible. Note: MySQL has no FULL OUTER JOIN — emulate with LEFT JOIN UNION RIGHT JOIN.",
+ code:{sql:`SELECT c1, c2
+FROM t1
+FULL OUTER JOIN t2 ON condition;`}},
+{id:"sql-cross-join", cat:"SQL", title:"CROSS JOIN", desc:"Cartesian product: every row of t1 paired with every row of t2.",
+ code:{sql:`SELECT c1, c2
+FROM t1
+CROSS JOIN t2;`}},
+{id:"sql-cross-join2", cat:"SQL", title:"Implicit cross join (comma)", desc:"Comma-separated tables also cross join; add a WHERE to turn it into an equi-join.",
+ code:{sql:`SELECT c1, c2
+FROM t1, t2;`}},
+{id:"sql-self-join", cat:"SQL", title:"Self join", desc:"Join a table to itself using two aliases (e.g. employee -> manager).",
+ code:{sql:`SELECT c1, c2
+FROM t1 A
+INNER JOIN t1 B ON condition;`}},
+
+/* ---------- set operators & predicates ---------- */
+{id:"sql-union", cat:"SQL", title:"UNION [ALL]", desc:"Stack rows of two queries (matching column count/types). UNION removes duplicates; UNION ALL keeps them.",
+ code:{sql:`SELECT c1, c2 FROM t1
+UNION [ALL]
+SELECT c1, c2 FROM t2;`}},
+{id:"sql-intersect", cat:"SQL", title:"INTERSECT", desc:"Rows present in both result sets.",
+ code:{sql:`SELECT c1, c2 FROM t1
+INTERSECT
+SELECT c1, c2 FROM t2;`}},
+{id:"sql-minus", cat:"SQL", title:"MINUS / EXCEPT", desc:"Rows in the first query but not the second. MINUS is Oracle; PostgreSQL/SQL Server/SQLite use EXCEPT.",
+ code:{sql:`SELECT c1, c2 FROM t1
+MINUS            -- EXCEPT in most databases
+SELECT c1, c2 FROM t2;`}},
+{id:"sql-like", cat:"SQL", title:"LIKE (pattern match)", desc:"Wildcard match: % = any run of characters, _ = exactly one character.",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE c1 LIKE 'a%';   -- starts with a ; use NOT LIKE to negate`}},
+{id:"sql-in", cat:"SQL", title:"IN (value list)", desc:"Match any value in a list (or a subquery).",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE c1 IN (1, 2, 3);   -- NOT IN to exclude`}},
+{id:"sql-between", cat:"SQL", title:"BETWEEN (range)", desc:"Match values in an inclusive range: low <= c1 <= high.",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE c1 BETWEEN low AND high;`}},
+{id:"sql-isnull", cat:"SQL", title:"IS [NOT] NULL", desc:"Test for NULL — you cannot compare to NULL with = (NULL = NULL is unknown).",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE c1 IS NULL;   -- or IS NOT NULL`}},
+
+/* ---------- managing tables ---------- */
+{id:"sql-create-table", cat:"SQL", title:"CREATE TABLE", desc:"Create a table with typed columns and inline column constraints.",
+ code:{sql:`CREATE TABLE t (
+  id    INT PRIMARY KEY,
+  name  VARCHAR NOT NULL,
+  price INT DEFAULT 0
+);`}},
+{id:"sql-drop-table", cat:"SQL", title:"DROP TABLE", desc:"Delete a table's data and structure from the database.",
+ danger:"Permanently removes the table and everything in it.",
+ code:{sql:`DROP TABLE t;`}},
+{id:"sql-truncate", cat:"SQL", title:"TRUNCATE TABLE", desc:"Remove all rows quickly, keeping the table structure.",
+ danger:"Deletes every row; usually cannot be rolled back and resets identity counters.",
+ code:{sql:`TRUNCATE TABLE t;`}},
+{id:"sql-add-column", cat:"SQL", title:"ALTER TABLE ADD column", desc:"Add a new column to an existing table.",
+ code:{sql:`ALTER TABLE t ADD column_name datatype;`}},
+{id:"sql-drop-column", cat:"SQL", title:"ALTER TABLE DROP COLUMN", desc:"Remove a column from a table.",
+ danger:"Permanently deletes the column and all data it holds.",
+ code:{sql:`ALTER TABLE t DROP COLUMN c;`}},
+{id:"sql-add-constraint", cat:"SQL", title:"ALTER TABLE ADD constraint", desc:"Attach a constraint (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK) to an existing table.",
+ code:{sql:`ALTER TABLE t ADD CONSTRAINT constraint_name constraint_definition;`}},
+{id:"sql-drop-constraint", cat:"SQL", title:"ALTER TABLE DROP constraint", desc:"Remove a named constraint from a table.",
+ code:{sql:`ALTER TABLE t DROP CONSTRAINT constraint_name;`}},
+{id:"sql-rename-table", cat:"SQL", title:"Rename a table", desc:"Rename table t1 to t2. (MySQL: RENAME TABLE t1 TO t2.)",
+ code:{sql:`ALTER TABLE t1 RENAME TO t2;`}},
+{id:"sql-rename-column", cat:"SQL", title:"Rename a column", desc:"Rename column c1 to c2. Some databases spell it ALTER TABLE t RENAME COLUMN c1 TO c2.",
+ code:{sql:`ALTER TABLE t1 RENAME c1 TO c2;`}},
+
+/* ---------- constraints ---------- */
+{id:"sql-primary-key", cat:"SQL", title:"PRIMARY KEY (composite)", desc:"Uniquely identify each row; a composite key spans several columns and implies NOT NULL.",
+ code:{sql:`CREATE TABLE t (
+  c1 INT,
+  c2 INT,
+  c3 VARCHAR,
+  PRIMARY KEY (c1, c2)
+);`}},
+{id:"sql-foreign-key", cat:"SQL", title:"FOREIGN KEY", desc:"Enforce referential integrity by pointing a column at another table's key.",
+ code:{sql:`CREATE TABLE t1 (
+  c1 INT PRIMARY KEY,
+  c2 INT,
+  FOREIGN KEY (c2) REFERENCES t2 (c2)
+);`}},
+{id:"sql-unique", cat:"SQL", title:"UNIQUE", desc:"Require the value (or combination of columns) to be unique across rows.",
+ code:{sql:`CREATE TABLE t (
+  c1 INT,
+  c2 INT,
+  UNIQUE (c2, c3)
+);`}},
+{id:"sql-check", cat:"SQL", title:"CHECK", desc:"Reject any row that fails a boolean condition.",
+ code:{sql:`CREATE TABLE t (
+  c1 INT,
+  c2 INT,
+  CHECK (c1 > 0 AND c1 >= c2)
+);`}},
+{id:"sql-not-null", cat:"SQL", title:"NOT NULL", desc:"Require a column to always hold a value.",
+ code:{sql:`CREATE TABLE t (
+  c1 INT PRIMARY KEY,
+  c2 VARCHAR NOT NULL
+);`}},
+
+/* ---------- modifying data ---------- */
+{id:"sql-insert-one", cat:"SQL", title:"INSERT one row", desc:"Add a single row to a table.",
+ code:{sql:`INSERT INTO t (column_list)
+VALUES (value_list);`}},
+{id:"sql-insert-many", cat:"SQL", title:"INSERT multiple rows", desc:"Add several rows in a single statement.",
+ code:{sql:`INSERT INTO t (column_list)
+VALUES
+  (value_list),
+  (value_list),
+  (value_list);`}},
+{id:"sql-insert-select", cat:"SQL", title:"INSERT ... SELECT", desc:"Insert rows produced by a query over another table.",
+ code:{sql:`INSERT INTO t1 (column_list)
+SELECT column_list
+FROM t2;`}},
+{id:"sql-update-where", cat:"SQL", title:"UPDATE (with WHERE)", desc:"Change columns only in rows that match the condition.",
+ code:{sql:`UPDATE t
+SET c1 = new_value,
+    c2 = new_value
+WHERE condition;`}},
+{id:"sql-update-all", cat:"SQL", title:"UPDATE all rows", desc:"Set a column for every row in the table.",
+ danger:"No WHERE clause — this changes every row.",
+ code:{sql:`UPDATE t
+SET c1 = new_value;`}},
+{id:"sql-delete-where", cat:"SQL", title:"DELETE (with WHERE)", desc:"Delete only the rows matching a condition.",
+ code:{sql:`DELETE FROM t
+WHERE condition;`}},
+{id:"sql-delete-all", cat:"SQL", title:"DELETE all rows", desc:"Delete every row while keeping the table structure.",
+ danger:"No WHERE clause — this empties the whole table.",
+ code:{sql:`DELETE FROM t;`}},
+
+/* ---------- views ---------- */
+{id:"sql-create-view", cat:"SQL", title:"CREATE VIEW", desc:"Save a query as a virtual table you can SELECT from.",
+ code:{sql:`CREATE VIEW v (c1, c2) AS
+SELECT c1, c2
+FROM t;`}},
+{id:"sql-view-check-option", cat:"SQL", title:"CREATE VIEW ... WITH CHECK OPTION", desc:"A view that rejects INSERT/UPDATE which would produce rows outside its WHERE clause.",
+ code:{sql:`CREATE VIEW v (c1, c2) AS
+SELECT c1, c2
+FROM t
+WITH [CASCADED | LOCAL] CHECK OPTION;`}},
+{id:"sql-recursive-view", cat:"SQL", title:"CREATE RECURSIVE VIEW", desc:"A view defined in terms of itself (anchor + recursive part). Most engines use a WITH RECURSIVE CTE instead.",
+ code:{sql:`CREATE RECURSIVE VIEW v AS
+  select_statement        -- anchor part
+UNION [ALL]
+  select_statement;       -- recursive part`}},
+{id:"sql-temp-view", cat:"SQL", title:"CREATE TEMPORARY VIEW", desc:"A view scoped to the current session; it disappears on disconnect.",
+ code:{sql:`CREATE TEMPORARY VIEW v AS
+SELECT c1, c2
+FROM t;`}},
+{id:"sql-drop-view", cat:"SQL", title:"DROP VIEW", desc:"Delete a view. The underlying table data is untouched.",
+ code:{sql:`DROP VIEW view_name;`}},
+
+/* ---------- indexes ---------- */
+{id:"sql-create-index", cat:"SQL", title:"CREATE INDEX", desc:"Speed up lookups/sorts on one or more columns (at the cost of slower writes).",
+ code:{sql:`CREATE INDEX idx_name
+ON t (c1, c2);`}},
+{id:"sql-unique-index", cat:"SQL", title:"CREATE UNIQUE INDEX", desc:"An index that also enforces uniqueness on the indexed columns.",
+ code:{sql:`CREATE UNIQUE INDEX idx_name
+ON t (c3, c4);`}},
+{id:"sql-drop-index", cat:"SQL", title:"DROP INDEX", desc:"Remove an index. Syntax varies (some need ON table).",
+ code:{sql:`DROP INDEX idx_name;`}},
+
+/* ---------- triggers & aggregates ---------- */
+{id:"sql-create-trigger", cat:"SQL", title:"CREATE TRIGGER", desc:"Run a stored procedure automatically on a table event. 'MODIFY' isn't standard — most engines use CREATE OR REPLACE / CREATE OR ALTER.",
+ code:{sql:`CREATE OR REPLACE TRIGGER trigger_name
+  { BEFORE | AFTER }             -- when
+  { INSERT | UPDATE | DELETE }   -- event
+  ON table_name
+  FOR EACH ROW                   -- or FOR EACH STATEMENT
+EXECUTE stored_procedure;`}},
+{id:"sql-trigger-example", cat:"SQL", title:"CREATE TRIGGER (example)", desc:"Fire a procedure before each new row is inserted into person.",
+ code:{sql:`CREATE TRIGGER before_insert_person
+BEFORE INSERT
+ON person FOR EACH ROW
+EXECUTE stored_procedure;`}},
+{id:"sql-drop-trigger", cat:"SQL", title:"DROP TRIGGER", desc:"Delete a trigger.",
+ code:{sql:`DROP TRIGGER trigger_name;`}},
+{id:"sql-aggregates", cat:"SQL", title:"Aggregate functions", desc:"AVG, COUNT, SUM, MIN, MAX summarize a set of rows — usually paired with GROUP BY.",
+ code:{sql:`SELECT
+  COUNT(*) AS row_count,
+  AVG(c2)  AS average,
+  SUM(c2)  AS total,
+  MIN(c2)  AS smallest,
+  MAX(c2)  AS largest
+FROM t;`}}
 ];
 
 /* ============================================================
@@ -2740,7 +3011,12 @@ function renderDetail(){
   const item=library.find(i=>i.id===selectedId);
   if(!item){ return; }
   const avail=langsOf(item);
-  const tabs=Object.keys(LANGS).map(l=>{
+  const CORE=['ps','cmd','mac','linux','py'];
+  // OS commands show all five OS tabs (greying out unsupported ones); non-OS
+  // entries (e.g. Google dorks) show only the tab(s) they actually provide.
+  const usesCore=avail.some(l=>CORE.includes(l));
+  const tabLangs=usesCore ? CORE.concat(avail.filter(l=>!CORE.includes(l))) : avail;
+  const tabs=tabLangs.map(l=>{
     const on=l===selectedLang, ok=item.code[l];
     return `<div class="tab ${on?'on':''} ${ok?'':'disabled'}" data-l="${l}">${LANGS[l].name}</div>`;
   }).join("");
@@ -2758,6 +3034,7 @@ function renderDetail(){
       <div class="codebar">
         <span class="fname">${fname}</span>
         <span class="acts">
+          <button class="act" id="editBtn">Edit</button>
           <button class="act" id="copyBtn">Copy</button>
           <button class="act" id="dlBtn">Download</button>
         </span>
@@ -2769,6 +3046,7 @@ function renderDetail(){
     if(t.classList.contains("disabled")) return;
     t.onclick=()=>{ selectedLang=t.dataset.l; renderDetail(); };
   });
+  $("#editBtn").onclick=()=>openModal(item.id);
   $("#copyBtn").onclick=()=>copyText(item.code[selectedLang], $("#copyBtn"));
   $("#dlBtn").onclick=()=>download(fname, item.code[selectedLang]);
 }
@@ -2798,21 +3076,66 @@ function download(name, text){
 
 /* ---------- add / import / export ---------- */
 const scrim=$("#scrim");
-$("#addBtn").onclick=()=>{
+const CODE_FIELDS={ps:"#code-ps", cmd:"#code-cmd", mac:"#code-mac", linux:"#code-linux", py:"#code-py", dork:"#code-dork", sql:"#code-sql"};
+let editingId=null;
+
+function openModal(id){
+  editingId=id||null;
+  const item=id ? library.find(i=>i.id===id) : null;
   $("#catlist").innerHTML=[...new Set(library.map(i=>i.cat))].map(c=>`<option value="${esc(c)}">`).join("");
+  $("#m-heading").textContent = item ? "Edit command" : "Add a snippet";
+  $("#m-title").value  = item ? item.title : "";
+  $("#m-cat").value    = item ? item.cat : "";
+  $("#m-desc").value   = item ? (item.desc||"") : "";
+  $("#m-danger").value = item ? (item.danger||"") : "";
+  Object.entries(CODE_FIELDS).forEach(([l,sel])=>{ $(sel).value = (item && item.code[l]) ? item.code[l] : ""; });
+  const del=$("#m-delete");
+  del.style.display = (item && item.custom) ? "" : "none";       // only our own entries can be removed
+  del.textContent   = (item && !String(item.id).startsWith("custom-")) ? "Revert to original" : "Delete";
   scrim.classList.add("open"); $("#m-title").focus();
-};
-$("#m-cancel").onclick=()=>scrim.classList.remove("open");
-scrim.onclick=e=>{ if(e.target===scrim) scrim.classList.remove("open"); };
+}
+function closeModal(){ scrim.classList.remove("open"); editingId=null; }
+
+$("#addBtn").onclick=()=>openModal(null);
+$("#m-cancel").onclick=closeModal;
+scrim.onclick=e=>{ if(e.target===scrim) closeModal(); };
+
 $("#m-save").onclick=()=>{
-  const title=$("#m-title").value.trim(), cat=($("#m-cat").value.trim()||"Custom"),
-        desc=$("#m-desc").value.trim()||"Custom snippet",
-        lang=$("#m-lang").value, code=$("#m-code").value;
-  if(!title || !code.trim()){ alert("Give it a name and some code."); return; }
-  library.push({id:"custom-"+Date.now(), cat, title, desc, code:{[lang]:code}});
-  ["#m-title","#m-cat","#m-desc","#m-code"].forEach(s=>$(s).value="");
-  scrim.classList.remove("open");
+  const title=$("#m-title").value.trim();
+  const cat=$("#m-cat").value.trim()||"Custom";
+  const desc=$("#m-desc").value.trim()||"Custom snippet";
+  const danger=$("#m-danger").value.trim();
+  const code={};
+  Object.entries(CODE_FIELDS).forEach(([l,sel])=>{ const v=$(sel).value; if(v.trim()) code[l]=v; });
+  if(!title){ alert("Give it a task name."); return; }
+  if(!Object.keys(code).length){ alert("Add code for at least one target (OS or search)."); return; }
+  const isOverride = editingId && !String(editingId).startsWith("custom-");
+  const entry={ id: editingId || ("custom-"+Date.now()), cat, title, desc, code, custom:true };
+  if(danger) entry.danger=danger;
+  if(isOverride) entry.override=true;                            // an edited built-in
+  const idx=library.findIndex(i=>i.id===entry.id);
+  if(idx===-1) library.push(entry); else library[idx]=entry;
+  closeModal();
   renderRail(); renderList();
+  if(selectedId===entry.id) select(entry.id);
+  persistAll();                                                  // this PC (+ linked USB file, if any)
+};
+
+$("#m-delete").onclick=()=>{
+  const id=editingId; if(!id) return;
+  const idx=library.findIndex(i=>i.id===id);
+  const orig=BUILTIN.find(b=>b.id===id);
+  if(idx>-1){
+    if(orig) library[idx]={...orig};                             // revert an edited built-in
+    else library.splice(idx,1);                                  // remove a pure custom
+  }
+  closeModal();
+  renderRail(); renderList();
+  if(selectedId===id){
+    if(orig){ select(id); }
+    else { selectedId=null; detailEl.innerHTML=`<div class="placeholder"><div class="big">SELECT A TASK</div><div class="hint">Pick a task on the left, then choose a language.</div></div>`; }
+  }
+  persistAll();
 };
 $("#exportBtn").onclick=()=>{
   download("fieldkit-library.json", JSON.stringify(library,null,2));
@@ -2823,9 +3146,10 @@ $("#importFile").onchange=e=>{
   const r=new FileReader();
   r.onload=()=>{ try{
       const data=JSON.parse(r.result);
-      if(Array.isArray(data)){ library=data; selectedId=null;
+      if(Array.isArray(data)){
+        const added=mergeCustoms(pickCustoms(data)); persistLocal(); selectedId=null;
         detailEl.innerHTML=`<div class="placeholder"><div class="big">LIBRARY LOADED</div>
-          <div class="hint">${data.length} tasks imported. Pick one to begin.</div></div>`;
+          <div class="hint">${added} custom command${added===1?"":"s"} imported. Pick one to begin.</div></div>`;
         renderRail(); renderList();
       } else alert("That file isn't a FieldKit library.");
     }catch(err){ alert("Couldn't read that JSON file."); } };
@@ -2848,9 +3172,133 @@ $("#langfilter").querySelectorAll("button").forEach(b=>{
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40); }
 
+/* ---------- persistence: custom snippets survive close/reopen & travel on the USB ---------- */
+const LS_KEY = "fieldkit.customs.v1";
+let fileHandle = null;                                   // linked JSON file on the drive (if any)
+const FSA = ("showOpenFilePicker" in window) && ("showSaveFilePicker" in window);
+let pendingHandle = null;                                // handle awaiting a one-click re-grant
+let baseSaveLabel = "Save file";
+function setBaseLabel(t){ baseSaveLabel = t; const b = $("#saveFileBtn"); if(b) b.textContent = t; }
+async function loadHandleData(h){
+  try { mergeCustoms(JSON.parse(await (await h.getFile()).text())); persistLocal(); renderRail(); renderList(); }
+  catch(e){}
+}
+
+function pickCustoms(list){
+  return Array.isArray(list) ? list.filter(x =>
+    x && x.id && x.code && (x.custom === true || String(x.id).startsWith("custom-"))) : [];
+}
+function customEntries(){ return library.filter(i => i.custom); }
+
+function mergeCustoms(list){
+  let n = 0;
+  pickCustoms(list).forEach(it => {
+    it.custom = true;
+    const idx = library.findIndex(i => i.id === it.id);
+    if(idx === -1){ library.push(it); n++; }
+    else if(library[idx].custom || it.override){ library[idx] = it; n++; }   // update our own / apply built-in overrides
+  });
+  return n;
+}
+
+function persistLocal(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(customEntries())); return true; }
+  catch(e){ return false; }
+}
+async function persistAll(){ persistLocal(); await writeLinkedFile(); }
+
+function loadLocalCustoms(){
+  try { mergeCustoms(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); } catch(e){}
+}
+
+/* --- optional file sync (Chromium: Edge/Chrome) via the File System Access API --- */
+function idbHandle(mode, value){
+  return new Promise((res, rej) => {
+    const open = indexedDB.open("fieldkit", 1);
+    open.onupgradeneeded = () => open.result.createObjectStore("kv");
+    open.onerror = () => rej(open.error);
+    open.onsuccess = () => {
+      const tx = open.result.transaction("kv", mode);
+      const store = tx.objectStore("kv");
+      const req = mode === "readwrite" ? store.put(value, "libFile") : store.get("libFile");
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    };
+  });
+}
+async function writeLinkedFile(){
+  if(!fileHandle) return;
+  try{
+    const w = await fileHandle.createWritable();
+    await w.write(JSON.stringify(customEntries(), null, 2));
+    await w.close();
+    setSync("Saved ✓");
+  }catch(e){ setSync("Save failed"); }
+}
+function setSync(msg){
+  const b = $("#saveFileBtn"); if(!b) return;
+  b.textContent = msg;
+  setTimeout(() => { b.textContent = baseSaveLabel; }, 1800);
+}
+async function saveToFile(){
+  // if a previously-linked file is waiting on a one-click re-grant, do that first
+  if(pendingHandle){
+    try{
+      if(await pendingHandle.requestPermission({ mode: "readwrite" }) === "granted"){
+        fileHandle = pendingHandle; pendingHandle = null; setBaseLabel("Save file");
+        await loadHandleData(fileHandle);   // pull latest customs from the USB
+        await writeLinkedFile();            // and push anything new from this PC
+        return;
+      }
+    }catch(e){}
+  }
+  if(!FSA){
+    alert("This browser can't auto-sync to a file.\n\nUse Export to save fieldkit-library.json onto the USB stick, then Import it on other PCs.");
+    return;
+  }
+  try{
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: "fieldkit-library.json",
+      types: [{ description: "FieldKit library", accept: { "application/json": [".json"] } }]
+    });
+    await idbHandle("readwrite", fileHandle);
+    setBaseLabel("Save file");
+    await writeLinkedFile();
+  }catch(e){ /* user cancelled the picker */ }
+}
+async function loadFromFile(){
+  if(!FSA){ $("#importFile").click(); return; }              // fall back to the Import file input
+  try{
+    const [h] = await window.showOpenFilePicker({
+      types: [{ description: "FieldKit library", accept: { "application/json": [".json"] } }]
+    });
+    fileHandle = h; pendingHandle = null; setBaseLabel("Save file");
+    await idbHandle("readwrite", fileHandle);
+    await loadHandleData(h);
+    setSync("Loaded ✓");
+  }catch(e){ /* cancelled or unreadable */ }
+}
+async function tryReconnectFile(){
+  if(!FSA) return;
+  try{
+    const h = await idbHandle("readonly");
+    if(!h) return;
+    if(await h.queryPermission({ mode: "readwrite" }) === "granted"){
+      fileHandle = h; await loadHandleData(h);                 // permission survived: silent auto-sync
+    } else {
+      pendingHandle = h; setBaseLabel("Reconnect USB");        // one click on Save file re-links it
+    }
+  }catch(e){}
+}
+
+$("#saveFileBtn").onclick = saveToFile;
+$("#loadFileBtn").onclick = loadFromFile;
+
 /* ---------- boot ---------- */
+loadLocalCustoms();
 renderRail();
 renderList();
+tryReconnectFile();
 </script>
 </body>
 </html>
