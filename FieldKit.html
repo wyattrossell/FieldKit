@@ -217,9 +217,21 @@
     margin:0; padding:16px; overflow-x:auto; font-family:var(--mono); font-size:12.5px;
     line-height:1.65; color:#dfe6ee; white-space:pre; tab-size:2;
   }
-  .placeholder{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--faint); gap:14px; padding:40px}
-  .placeholder .big{font-family:var(--mono); font-size:15px; color:var(--muted); letter-spacing:1px}
-  .placeholder .hint{font-size:12.5px; max-width:34ch; text-align:center; line-height:1.6}
+  .placeholder{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--faint); gap:16px; padding:40px}
+  .placeholder .big{font-family:var(--mono); font-size:20px; color:var(--amber); letter-spacing:3px; font-weight:700}
+  .placeholder .hint{font-size:13px; max-width:42ch; text-align:center; line-height:1.6}
+  .placeholder .hint.sub{font-size:12px; color:var(--faint); max-width:46ch}
+  .placeholder .tips{display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-top:2px}
+  .placeholder .tips span{display:inline-flex; align-items:center; gap:5px; font-family:var(--mono); font-size:11.5px; color:var(--muted)}
+  kbd{font-family:var(--mono); font-size:11px; color:var(--ink); background:var(--panel2); border:1px solid var(--edge2); border-bottom-width:2px; border-radius:4px; padding:1px 6px; min-width:16px; text-align:center}
+  /* result-count header on the list */
+  .listhdr{position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 16px; background:var(--panel); border-bottom:1px solid var(--edge); font-family:var(--mono); font-size:11px; color:var(--faint)}
+  .listhdr .clearf{cursor:pointer; color:var(--amber); text-decoration:underline; white-space:nowrap}
+  .listhdr .clearf:hover{color:var(--ink)}
+  /* mobile category selector (rail is hidden < 900px) */
+  select#catSel{display:none}
+  /* keyboard focus visibility */
+  :focus-visible{outline:2px solid var(--amber); outline-offset:2px; border-radius:4px}
   /* modal */
   .scrim{position:fixed; inset:0; background:rgba(6,9,12,.72); display:none; align-items:center; justify-content:center; z-index:20; padding:20px}
   .scrim.open{display:flex}
@@ -249,6 +261,7 @@
     main{grid-template-columns:1fr}
     .rail{display:none}
     .list{max-height:38vh; border-right:0; border-bottom:1px solid var(--edge)}
+    select#catSel{display:inline-block}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -257,12 +270,12 @@
 <header>
   <div class="brand">
     <span class="mark">FIELDKIT</span>
-    <span class="sub">offline script library</span>
   </div>
   <label class="search">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-    <input id="q" type="text" placeholder="search tasks, e.g. hash, ping, admin, prefetch…" autocomplete="off">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="q" type="text" placeholder="search tasks, e.g. hash, ping, admin, prefetch…" autocomplete="off" aria-label="Search tasks">
   </label>
+  <select class="toolbtn" id="catSel" title="Category" aria-label="Category"></select>
   <div class="langfilter" id="langfilter">
     <button data-l="all" class="on">ALL</button>
     <button data-l="ps">PS</button>
@@ -297,12 +310,7 @@
 <main>
   <nav class="rail" id="rail"><h4>Categories</h4></nav>
   <section class="list" id="list"></section>
-  <section class="detail" id="detail">
-    <div class="placeholder">
-      <div class="big">SELECT A TASK</div>
-      <div class="hint">Pick a task on the left, then choose a language. Copy it to the clipboard or download it as a ready-to-run script file.</div>
-    </div>
-  </section>
+  <section class="detail" id="detail"></section>
 </main>
 
 <footer class="foot">⚠ Authorized use &amp; education only — you are responsible for legal compliance.</footer>
@@ -421,8 +429,17 @@ function renderRail(){
   cats.forEach(c=>html+=railItem(c,c));
   railEl.innerHTML=html;
   railEl.querySelectorAll(".cat").forEach(el=>{
-    el.onclick=()=>{ activeCat=el.dataset.c; renderRail(); renderList(); };
+    el.onclick=()=>{ activeCat=el.dataset.c; tagsExpanded=false; renderRail(); renderList(); };
   });
+  // mobile category selector mirrors the rail (rail is hidden < 900px)
+  const sel=$("#catSel");
+  if(sel){
+    const opt=(v,label)=>`<option value="${esc(v)}" ${v===activeCat?"selected":""}>${esc(label)}</option>`;
+    let o=opt("All",`All (${library.length})`);
+    if(favorites.size) o+=opt("__fav",`★ Favorites (${favorites.size})`);
+    cats.forEach(c=>o+=opt(c,`${c} (${counts(c)})`));
+    sel.innerHTML=o;
+  }
   renderTagBar();
   function railItem(c,label){
     return `<div class="cat ${c===activeCat?'on':''}" data-c="${c}">
@@ -457,11 +474,14 @@ function renderTagBar(){
 
 function renderList(){
   const items=library.filter(matches);
+  const hdr=`<div class="listhdr"><span>${items.length} result${items.length===1?"":"s"}</span>`
+          + `${filtersActive()?`<span class="clearf" id="clearFilters" role="button" tabindex="0">clear filters</span>`:""}</div>`;
   if(!items.length){
-    listEl.innerHTML=`<div class="empty">No tasks match.<br>Try a different search or language.</div>`;
+    listEl.innerHTML=hdr+`<div class="empty">No tasks match.<br>Try a different search, team, or language.</div>`;
+    wireClearFilters();
     return;
   }
-  listEl.innerHTML=items.map(i=>{
+  listEl.innerHTML=hdr+items.map(i=>{
     const chips = isWidget(i)
       ? `<span class="chip gen">GEN</span>`
       : isTool(i)
@@ -477,16 +497,55 @@ function renderList(){
   listEl.querySelectorAll(".item").forEach(el=>{
     el.onclick=()=>select(el.dataset.id);
   });
+  wireClearFilters();
+}
+function wireClearFilters(){
+  const cf=$("#clearFilters"); if(!cf) return;
+  cf.onclick=clearAllFilters;
+  cf.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); clearAllFilters(); } };
 }
 
 function select(id){
-  selectedId=id;
   const item=library.find(i=>i.id===id);
+  if(!item) return;
+  selectedId=id;
   const avail=langsOf(item);
   // honor the global language filter if that language exists here
   selectedLang = (activeLangFilter!=="all" && item.code && item.code[activeLangFilter]) ? activeLangFilter : avail[0];
+  try{ history.replaceState(null,"","#"+encodeURIComponent(id)); }catch(e){ try{ location.hash=id; }catch(_){} }
   renderList();
   renderDetail();
+}
+
+function placeholderHTML(){
+  return `<div class="placeholder">
+    <div class="big">FIELDKIT</div>
+    <div class="hint">${library.length} copy-paste-ready commands for blue, red &amp; purple teams — fully offline.</div>
+    <div class="tips">
+      <span><kbd>/</kbd> search</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> browse</span>
+      <span><kbd>Enter</kbd> open</span>
+      <span><kbd>c</kbd> copy</span>
+    </div>
+    <div class="hint sub">Filter by team, language, or tag · switch color themes top-right · pin favorites with ☆ · bookmark any entry (its URL updates as you browse).</div>
+  </div>`;
+}
+function showPlaceholder(){ selectedId=null; detailEl.innerHTML=placeholderHTML(); }
+
+function filtersActive(){
+  return activeCat!=="All" || activeTeam!=="all" || activeLangFilter!=="all" || activeTags.size>0 || !!query;
+}
+function clearAllFilters(){
+  activeCat="All"; activeTeam="all"; activeLangFilter="all"; activeTags.clear(); query=""; tagsExpanded=false;
+  const q=$("#q"); if(q) q.value="";
+  $("#langfilter").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.l==="all"));
+  $("#teamfilter").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.tm==="all"));
+  renderRail(); renderList();
+}
+function openFromHash(){
+  const h=decodeURIComponent((location.hash||"").replace(/^#/,""));
+  if(h && library.some(i=>i.id===h)){ select(h); const el=listEl.querySelector(".item.on"); if(el) el.scrollIntoView({block:"nearest"}); return true; }
+  return false;
 }
 
 /* ---------- extended-schema helpers ---------- */
@@ -514,7 +573,7 @@ function tagChips(item){
 function headBlock(item){
   const badges=(teamBadge(item)||attackBadges(item)) ? `<div class="badges">${teamBadge(item)}${attackBadges(item)}</div>` : "";
   return `<div class="head">
-      <button class="favbtn ${isFav(item.id)?'on':''}" id="favBtn" title="Pin to Favorites">${isFav(item.id)?'★':'☆'}</button>
+      <button class="favbtn ${isFav(item.id)?'on':''}" id="favBtn" title="Pin to Favorites" aria-label="${isFav(item.id)?'Unpin from':'Pin to'} favorites" aria-pressed="${isFav(item.id)?'true':'false'}">${isFav(item.id)?'★':'☆'}</button>
       <div class="cat-tag">${esc(item.cat)}</div>
       <h2>${esc(item.title)}</h2>
       <div class="desc">${esc(item.desc)}</div>
@@ -802,7 +861,7 @@ $("#m-delete").onclick=()=>{
   renderRail(); renderList();
   if(selectedId===id){
     if(orig){ select(id); }
-    else { selectedId=null; detailEl.innerHTML=`<div class="placeholder"><div class="big">SELECT A TASK</div><div class="hint">Pick a task on the left, then choose a language.</div></div>`; }
+    else { showPlaceholder(); }
   }
   persistAll();
 };
@@ -827,6 +886,11 @@ $("#importFile").onchange=e=>{
 
 /* ---------- filters ---------- */
 $("#q").oninput=e=>{ query=e.target.value.trim().toLowerCase(); tagsExpanded=false; renderTagBar(); renderList(); };
+$("#q").onkeydown=e=>{
+  if(e.key==="Enter"){ const vis=library.filter(matches); if(vis.length){ select(vis[0].id); e.target.blur(); } }
+  else if(e.key==="Escape" && e.target.value){ e.preventDefault(); e.target.value=""; query=""; tagsExpanded=false; renderTagBar(); renderList(); }
+};
+$("#catSel").onchange=e=>{ activeCat=e.target.value; tagsExpanded=false; renderRail(); renderList(); };
 $("#langfilter").querySelectorAll("button").forEach(b=>{
   b.onclick=()=>{
     $("#langfilter").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
@@ -985,9 +1049,15 @@ document.addEventListener("keydown", e=>{
     idx = e.key==="ArrowDown" ? Math.min(vis.length-1, idx+1) : Math.max(0, idx<0?0:idx-1);
     select(vis[idx].id);
     const el=listEl.querySelector(".item.on"); if(el) el.scrollIntoView({block:"nearest"});
+  } else if(e.key==="Enter"){
+    if(!selectedId){ const vis=library.filter(matches); if(vis.length) select(vis[0].id); }
   } else if(e.key==="c"){
     const b=$("#copyBtn"); if(b) b.click();
   }
+});
+window.addEventListener("hashchange",()=>{
+  const h=decodeURIComponent((location.hash||"").replace(/^#/,""));
+  if(h && h!==selectedId && library.some(i=>i.id===h)) select(h);
 });
 
 /* ---------- boot ---------- */
@@ -996,6 +1066,7 @@ loadFavorites();
 loadLocalCustoms();
 renderRail();
 renderList();
+if(!openFromHash()) showPlaceholder();   // deep-link to #id, else show the welcome screen
 tryReconnectFile();
 </script>
 </body>

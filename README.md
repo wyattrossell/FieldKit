@@ -30,8 +30,12 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
   the detail pane.
 - **Color themes** — Field Amber, Night Slate, Paper (light), High-Contrast, and Terminal
   Green, remembered between sessions.
-- **Favorites**, keyboard nav (`/` search, ↑/↓ list, `c` copy), and one-click **Copy /
+- **Favorites**, keyboard-first nav (`/` focus search, ↑/↓ browse, `Enter` open, `Esc` clear,
+  `c` copy), a live **result count** with one-click **clear filters**, and one-click **Copy /
   Download** (works from `file://`).
+- **Bookmarkable** — the URL updates to `#entry-id` as you browse, so any command can be
+  linked or bookmarked and reopens on load. Works on mobile too (a category selector replaces
+  the rail on narrow screens).
 - **Add / Edit** entries in-app and sync them to a JSON file on the USB.
 
 ## Offline usage
