@@ -2695,5 +2695,27 @@ EXECUTE stored_procedure;`}},
   SUM(c2)  AS total,
   MIN(c2)  AS smallest,
   MAX(c2)  AS largest
-FROM t;`}}
+FROM t;`}},
+
+/* ================= RECONNAISSANCE ================= */
+{id:"recon-nmap-sweep", cat:"Reconnaissance", title:"Service & version scan",
+ desc:"Fingerprint open ports, services, and versions on a host or subnet. Requires nmap.",
+ danger:"Scan only systems you are authorized to test.",
+ team:"red", tags:["network","recon","quick-win"], attack:["T1046"],
+ detect:"IDS/flow logs show many ports from one source in a short window; alert on scan signatures (e.g. Suricata ET SCAN).",
+ mitigate:"Rate-limit and segment networks; restrict management ports; monitor east-west traffic.",
+ code:{
+  linux:`nmap -sV -p- {{TARGET:10.0.0.0/24}} -oA scan`,
+  mac:`nmap -sV -p- {{TARGET:10.0.0.0/24}} -oA scan`,
+  ps:`# requires nmap in PATH
+nmap -sV -p- {{TARGET:10.0.0.0/24}} -oA scan`
+ }},
+
+/* ================= TOOLS ================= */
+{id:"tool-nmap", cat:"Tools", title:"Nmap",
+ desc:"Network mapper — host discovery, port/service/OS fingerprinting.",
+ url:"https://nmap.org/download.html", license:"open source (NPSL)",
+ platforms:["windows","macos","linux"],
+ tags:["network","recon"], attack:["T1046","T1595"],
+ install:{cmd:"winget install Insecure.Nmap", mac:"brew install nmap", linux:"sudo apt install nmap"}}
 ];
