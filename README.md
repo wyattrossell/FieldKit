@@ -18,7 +18,9 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
   **Detect** line, and a **Mitigate** line — so defenders can recognize the same activity.
 - **Placeholders** — editable `{{TARGET:10.0.0.0/24}}` fields fill live into Copy/Download.
 - **Tools catalog** — official link, license, platforms, and per-OS install one-liners (AV/EDR
-  like ClamAV & Malwarebytes, ransomware decryptors, forensics/RE suites, remote-access tools, and more).
+  like ClamAV & Malwarebytes, ransomware decryptors, forensics/RE suites, remote-access tools,
+  and a growing set of common **Kali Linux CLI tools** — each paired with ready-to-run command
+  and workflow entries).
 - **Interactive generators** — built-in widgets such as the **Crontab Generator**: pick a
   preset or set each field, get the cron expression, a plain-English summary, and a
   ready-to-paste `crontab` install line.
