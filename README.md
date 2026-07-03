@@ -72,3 +72,15 @@ purple-team content policy, and the macOS-vs-Linux correctness rules.
 ## License
 
 [MIT](LICENSE) © 2026 Wyatt Rossell.
+
+---
+
+## Support
+
+If FieldKit saves you time in the field, consider supporting its development — thank you! ☕
+
+<p align="center">
+  <a href="https://buymeacoffee.com/wyattrossell" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50">
+  </a>
+</p>
