@@ -14,6 +14,10 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
 
 - Searchable library of copy-paste-ready commands across **PowerShell, Windows CMD, macOS
   (BSD), Linux (GNU)**, plus **Python**, **Google dorks**, and **SQL**.
+- **Command essentials for beginners** — dedicated **Linux Essentials** and **Windows
+  Essentials** sections cover the fundamental commands (ls, chmod, usermod, ps, tar; dir,
+  tasklist, sc, net user, …) with plain-language descriptions and common examples. Search a
+  command name and it ranks to the top.
 - **Purple-team format:** offensive entries are paired with a MITRE **ATT&CK** id, a
   **Detect** line, and a **Mitigate** line — so defenders can recognize the same activity.
 - **Placeholders** — editable `{{TARGET:10.0.0.0/24}}` fields fill live into Copy/Download.

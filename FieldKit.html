@@ -433,6 +433,7 @@ const TAG_CAP = 20;
 // category rail grouped into collapsible domains (order matters; any category
 // not listed falls into an auto "Other" group so nothing is ever hidden)
 const DOMAINS = [
+  ["Essentials", ["Linux Essentials","Windows Essentials"]],
   ["Recon & OSINT", ["Reconnaissance","OSINT","Enumeration","Google Dorks","Network"]],
   ["Offensive", ["Active Directory Attacks","Exploitation Frameworks","Password Auditing","Post-Exploitation","Privilege-Escalation Enumeration","Web App Testing","Wireless Auditing"]],
   ["Defense, IR & Forensics", ["Detection Engineering","Incident Response & Live Triage","Event Logs","Forensics","Security","Backup & Recovery"]],
@@ -578,7 +579,12 @@ function renderTagBar(){
 }
 
 function renderList(){
-  const items=library.filter(matches);
+  let items=library.filter(matches);
+  if(query){
+    // rank title matches first (typing a command name should surface that command)
+    const score=it=>{ const t=(it.title||"").toLowerCase(); return t.startsWith(query)?0 : t.includes(query)?1 : 2; };
+    items=items.map((it,i)=>[it,i]).sort((a,b)=>(score(a[0])-score(b[0]))||(a[1]-b[1])).map(p=>p[0]);
+  }
   const hdr=`<div class="listhdr"><span>${items.length} result${items.length===1?"":"s"}</span>`
           + `${filtersActive()?`<span class="clearf" id="clearFilters" role="button" tabindex="0">clear filters</span>`:""}</div>`;
   if(!items.length){
