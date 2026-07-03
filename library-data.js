@@ -2711,6 +2711,321 @@ FROM t;`}},
 nmap -sV -p- {{TARGET:10.0.0.0/24}} -oA scan`
  }},
 
+/* --- host discovery & port scanning --- */
+{id:"recon-host-discovery", cat:"Reconnaissance", title:"Live-host discovery (no port scan)",
+ desc:"Find responsive hosts on a subnet via ICMP/ARP without scanning ports. Requires nmap.",
+ danger:"Scan only systems you are authorized to test.",
+ team:"red", tags:["recon","network","discovery"], attack:["T1018"],
+ detect:"Bursts of ICMP echo or ARP requests to many addresses from one host; NIDS sweep signatures.",
+ mitigate:"Segment networks; drop unsolicited ICMP at boundaries; alert on horizontal sweeps.",
+ code:{
+  linux:`nmap -sn {{TARGET:10.0.0.0/24}}`,
+  mac:`nmap -sn {{TARGET:10.0.0.0/24}}`
+ }},
+{id:"recon-arp-scan", cat:"Reconnaissance", title:"ARP scan (local segment)",
+ desc:"Enumerate live hosts on the local L2 segment via ARP — works even when ICMP is filtered. Needs nmap + root.",
+ danger:"Local-segment scan; authorized networks only.",
+ team:"red", tags:["recon","network","discovery"], attack:["T1018"],
+ detect:"Flood of ARP who-has requests from one MAC; switch/NAC ARP-anomaly alerts.",
+ mitigate:"Dynamic ARP Inspection; port security; segment broadcast domains.",
+ code:{
+  linux:`sudo nmap -PR -sn {{TARGET:10.0.0.0/24}}`,
+  mac:`sudo nmap -PR -sn {{TARGET:10.0.0.0/24}}`
+ }},
+{id:"recon-nmap-top", cat:"Reconnaissance", title:"Fast top-ports scan",
+ desc:"Quick sweep of the most common TCP ports on a host. Requires nmap.",
+ danger:"Scan only systems you are authorized to test.",
+ team:"red", tags:["recon","network","scanning","quick-win"], attack:["T1046"],
+ detect:"SYNs to many ports from one source in a short window; IDS portscan signatures.",
+ mitigate:"Rate-limit; drop half-open floods; restrict exposed services.",
+ code:{
+  linux:`nmap --top-ports 100 -T4 {{IP:10.0.0.5}}`,
+  mac:`nmap --top-ports 100 -T4 {{IP:10.0.0.5}}`
+ }},
+{id:"recon-nmap-udp", cat:"Reconnaissance", title:"UDP service scan",
+ desc:"Probe common UDP services (DNS, SNMP, NTP, etc.). Slow; needs nmap + root.",
+ danger:"Scan only systems you are authorized to test.",
+ team:"red", tags:["recon","network","scanning"], attack:["T1046"],
+ detect:"UDP probes to many ports; ICMP port-unreachable bursts from the target.",
+ mitigate:"Filter unused UDP at the edge; rate-limit ICMP unreachables.",
+ code:{
+  linux:`sudo nmap -sU --top-ports 50 {{IP:10.0.0.5}}`,
+  mac:`sudo nmap -sU --top-ports 50 {{IP:10.0.0.5}}`
+ }},
+{id:"recon-nmap-os", cat:"Reconnaissance", title:"OS detection",
+ desc:"Fingerprint the target operating system from TCP/IP stack behavior. Needs nmap + root.",
+ danger:"Scan only systems you are authorized to test.",
+ team:"red", tags:["recon","network","scanning"], attack:["T1046"],
+ detect:"Unusual TCP flag combinations / malformed probes characteristic of OS fingerprinting.",
+ mitigate:"Normalize traffic at a proxy/firewall; limit exposed stack details.",
+ code:{
+  linux:`sudo nmap -O {{IP:10.0.0.5}}`,
+  mac:`sudo nmap -O {{IP:10.0.0.5}}`
+ }},
+{id:"recon-nmap-scripts", cat:"Reconnaissance", title:"Default NSE script scan",
+ desc:"Run nmap's safe default scripts (-sC) with version detection for quick service context.",
+ danger:"Scan only systems you are authorized to test.",
+ team:"red", tags:["recon","network","enumeration"], attack:["T1046"],
+ detect:"Version probes plus scripted follow-up requests (HTTP titles, SMB info) from one source.",
+ mitigate:"Minimize service banners; patch; restrict exposure.",
+ code:{
+  linux:`nmap -sC -sV {{IP:10.0.0.5}}`,
+  mac:`nmap -sC -sV {{IP:10.0.0.5}}`
+ }},
+{id:"recon-nmap-vuln", cat:"Reconnaissance", title:"Vulnerability NSE scripts",
+ desc:"Run nmap's 'vuln' script category to flag known-vulnerable services. Noisy.",
+ danger:"Vulnerability probing — authorized engagements only.",
+ team:"red", tags:["recon","network","scanning"], attack:["T1595.002"],
+ detect:"Scanner-signature payloads against services; WAF/IDS vuln-scan alerts; spikes of odd requests.",
+ mitigate:"Patch; virtual-patch at WAF; alert on known scanner user-agents/payloads.",
+ code:{
+  linux:`nmap -sV --script vuln {{IP:10.0.0.5}}`,
+  mac:`nmap -sV --script vuln {{IP:10.0.0.5}}`
+ }},
+{id:"recon-masscan", cat:"Reconnaissance", title:"Mass port scan (masscan)",
+ desc:"Internet-scale asynchronous TCP scanner. Requires masscan + root; set a sane --rate.",
+ danger:"Very high traffic; authorized networks only. Excessive rates can disrupt links.",
+ team:"red", tags:["recon","network","scanning"], attack:["T1595.001"],
+ detect:"Extremely high-rate SYNs across many hosts/ports from one source; flow-volume anomaly.",
+ mitigate:"Ingress rate-limiting; SYN-flood protection; block scanning source ranges.",
+ code:{
+  linux:`sudo masscan {{TARGET:10.0.0.0/24}} -p1-65535 --rate 1000`,
+  mac:`sudo masscan {{TARGET:10.0.0.0/24}} -p1-65535 --rate 1000`
+ }},
+
+/* --- DNS --- */
+{id:"recon-dns-records", cat:"Reconnaissance", title:"Enumerate DNS records",
+ desc:"Pull the common record types for a domain. dig on mac/linux; Resolve-DnsName on Windows.",
+ danger:"OSINT — scope to authorized engagements; queries public DNS, not the target.",
+ team:"red", tags:["recon","dns","osint"], attack:["T1590.002"],
+ detect:"Passive against the target; visible only to the resolver/authoritative server operator.",
+ mitigate:"Minimize public DNS footprint; split-horizon DNS; avoid leaking internal names.",
+ code:{
+  linux:`for t in A AAAA MX NS TXT SOA; do echo "== $t =="; dig +short {{DOMAIN:example.com}} $t; done`,
+  mac:`for t in A AAAA MX NS TXT SOA; do echo "== $t =="; dig +short {{DOMAIN:example.com}} $t; done`,
+  ps:`foreach ($t in 'A','AAAA','MX','NS','TXT','SOA') { "== $t =="; Resolve-DnsName {{DOMAIN:example.com}} -Type $t -ErrorAction SilentlyContinue }`
+ }},
+{id:"recon-dns-reverse", cat:"Reconnaissance", title:"Reverse DNS sweep",
+ desc:"Resolve PTR records across a range to map hostnames to IPs.",
+ danger:"OSINT — scope to authorized engagements; queries DNS, not the hosts.",
+ team:"red", tags:["recon","dns","discovery"], attack:["T1590.002"],
+ detect:"Sequential PTR lookups across a subnet at the DNS server.",
+ mitigate:"Limit PTR detail for sensitive ranges; monitor bulk reverse lookups.",
+ code:{
+  linux:`for i in $(seq 1 254); do host {{PREFIX:10.0.0}}.$i 2>/dev/null | grep -v "not found"; done`,
+  mac:`for i in $(seq 1 254); do host {{PREFIX:10.0.0}}.$i 2>/dev/null | grep -v "not found"; done`
+ }},
+{id:"recon-dns-axfr", cat:"Reconnaissance", title:"Zone transfer attempt (AXFR)",
+ desc:"Try to pull an entire DNS zone from a misconfigured name server.",
+ danger:"Authorized engagements only.",
+ team:"red", tags:["recon","dns","enumeration"], attack:["T1590.002"],
+ detect:"AXFR requests from non-secondary IPs are logged by the DNS server — alert on them.",
+ mitigate:"Restrict AXFR to authorized secondaries (allow-transfer); disable public zone transfers.",
+ code:{
+  linux:`dig axfr @{{NS:ns1.example.com}} {{DOMAIN:example.com}}`,
+  mac:`dig axfr @{{NS:ns1.example.com}} {{DOMAIN:example.com}}`
+ }},
+{id:"recon-subdomains", cat:"Reconnaissance", title:"Passive subdomain enumeration",
+ desc:"Discover subdomains from public sources (CT logs, passive DNS). Requires subfinder or amass.",
+ danger:"OSINT — scope to authorized engagements; uses third-party data, not the target.",
+ team:"red", tags:["recon","dns","subdomain","osint"], attack:["T1590.002"],
+ detect:"Passive — invisible to the target; watch Certificate Transparency for your own exposed names.",
+ mitigate:"Audit CT logs for your domains; retire stale DNS entries; wildcard carefully.",
+ code:{
+  linux:`subfinder -d {{DOMAIN:example.com}} -silent   # or: amass enum -passive -d {{DOMAIN:example.com}}`,
+  mac:`subfinder -d {{DOMAIN:example.com}} -silent   # or: amass enum -passive -d {{DOMAIN:example.com}}`
+ }},
+{id:"recon-dns-brute", cat:"Reconnaissance", title:"Subdomain brute force",
+ desc:"Actively guess subdomains from a wordlist. Requires gobuster (dns mode).",
+ danger:"Active DNS queries; authorized engagements only.",
+ team:"red", tags:["recon","dns","subdomain","scanning"], attack:["T1590.002"],
+ detect:"Spike of NXDOMAIN lookups for one zone from a single resolver/source.",
+ mitigate:"Rate-limit resolvers; monitor NXDOMAIN spikes; response-rate limiting.",
+ code:{
+  linux:`gobuster dns -d {{DOMAIN:example.com}} -w {{WORDLIST:/usr/share/wordlists/subdomains.txt}}`,
+  mac:`gobuster dns -d {{DOMAIN:example.com}} -w {{WORDLIST:/usr/share/wordlists/subdomains.txt}}`
+ }},
+
+/* --- web --- */
+{id:"recon-http-fingerprint", cat:"Reconnaissance", title:"Web server & tech fingerprint",
+ desc:"Identify server, framework, and technologies. whatweb (dep) or native curl/Invoke-WebRequest.",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","web","enumeration"], attack:["T1592"],
+ detect:"Low signal; a HEAD/GET plus tech-probe requests. Odd user-agents (WhatWeb) in web logs.",
+ mitigate:"Suppress version banners (Server/X-Powered-By); generic error pages.",
+ code:{
+  linux:`whatweb {{URL:http://10.0.0.5}}   # or: curl -sI {{URL:http://10.0.0.5}}`,
+  mac:`whatweb {{URL:http://10.0.0.5}}   # or: curl -sI {{URL:http://10.0.0.5}}`,
+  ps:`(Invoke-WebRequest {{URL:http://10.0.0.5}} -Method Head).Headers`
+ }},
+{id:"recon-dir-brute", cat:"Reconnaissance", title:"Directory & file brute force",
+ desc:"Discover hidden paths/files on a web server from a wordlist. Requires ffuf (or gobuster).",
+ danger:"Authorized targets only; generates heavy request volume.",
+ team:"red", tags:["recon","web","scanning"], attack:["T1595.003"],
+ detect:"Many 404/403 responses to random paths from one source; WAF path-enumeration alerts.",
+ mitigate:"Rate-limit; WAF; remove sensitive files; block on 404 thresholds.",
+ code:{
+  linux:`ffuf -u {{URL:http://10.0.0.5}}/FUZZ -w {{WORDLIST:/usr/share/wordlists/dirb/common.txt}} -mc 200,301,302,403`,
+  mac:`ffuf -u {{URL:http://10.0.0.5}}/FUZZ -w {{WORDLIST:/usr/share/wordlists/dirb/common.txt}} -mc 200,301,302,403`
+ }},
+{id:"recon-vhost", cat:"Reconnaissance", title:"Virtual host discovery",
+ desc:"Find name-based virtual hosts by fuzzing the Host header. Requires ffuf.",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","web","subdomain","scanning"], attack:["T1595.003"],
+ detect:"Many requests to one IP with varying Host headers; unusual host values in logs.",
+ mitigate:"Default-deny unknown vhosts; return generic response for unmatched Host.",
+ code:{
+  linux:`ffuf -u http://{{IP:10.0.0.5}}/ -H "Host: FUZZ.{{DOMAIN:example.com}}" -w {{WORDLIST:/usr/share/wordlists/subdomains.txt}} -fs 0`,
+  mac:`ffuf -u http://{{IP:10.0.0.5}}/ -H "Host: FUZZ.{{DOMAIN:example.com}}" -w {{WORDLIST:/usr/share/wordlists/subdomains.txt}} -fs 0`
+ }},
+{id:"recon-robots", cat:"Reconnaissance", title:"robots.txt & sitemap",
+ desc:"Fetch robots.txt and sitemap.xml for hints at hidden or sensitive paths.",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","web","osint","quick-win"], attack:["T1594"],
+ detect:"Low signal — normal-looking GETs to /robots.txt and /sitemap.xml.",
+ mitigate:"Don't list sensitive paths in robots.txt; protect them with authz instead.",
+ code:{
+  linux:`curl -s {{URL:http://10.0.0.5}}/robots.txt; echo; curl -s {{URL:http://10.0.0.5}}/sitemap.xml`,
+  mac:`curl -s {{URL:http://10.0.0.5}}/robots.txt; echo; curl -s {{URL:http://10.0.0.5}}/sitemap.xml`,
+  ps:`(Invoke-WebRequest {{URL:http://10.0.0.5}}/robots.txt).Content`
+ }},
+{id:"recon-tls-san", cat:"Reconnaissance", title:"TLS certificate SAN names",
+ desc:"Extract Subject Alternative Names from a host's cert to reveal related hostnames.",
+ danger:"OSINT — scope to authorized engagements.",
+ team:"red", tags:["recon","tls","subdomain","osint"], attack:["T1592"],
+ detect:"A single TLS handshake — effectively invisible; the same data is public in CT logs.",
+ mitigate:"Assume SANs are public; avoid putting internal hostnames on public certs.",
+ code:{
+  linux:`echo | openssl s_client -connect {{HOST:example.com}}:443 -servername {{HOST:example.com}} 2>/dev/null | openssl x509 -noout -text | grep -A1 "Subject Alternative Name"`,
+  mac:`echo | openssl s_client -connect {{HOST:example.com}}:443 -servername {{HOST:example.com}} 2>/dev/null | openssl x509 -noout -text | grep -A1 "Subject Alternative Name"`
+ }},
+{id:"recon-wafw00f", cat:"Reconnaissance", title:"WAF detection",
+ desc:"Identify whether (and which) web application firewall fronts a site. Requires wafw00f.",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","web","enumeration"], attack:["T1592"],
+ detect:"A handful of probe requests designed to trigger WAF fingerprints; low volume.",
+ mitigate:"Not much to do — but ensure the WAF fails closed and hides its vendor where possible.",
+ code:{
+  linux:`wafw00f {{URL:http://10.0.0.5}}`,
+  mac:`wafw00f {{URL:http://10.0.0.5}}`
+ }},
+{id:"recon-wpscan", cat:"Reconnaissance", title:"WordPress enumeration",
+ desc:"Enumerate WordPress users, themes, and vulnerable plugins. Requires wpscan (+API token for vuln data).",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","web","enumeration"], attack:["T1595.002"],
+ detect:"Enumeration of /wp-json/wp/v2/users and ?author= scans; plugin/readme probing in web logs.",
+ mitigate:"Block user enumeration; hide version/readme; limit login; keep plugins patched; WAF.",
+ code:{
+  linux:`wpscan --url {{URL:http://10.0.0.5}} --enumerate u,vp   # add --api-token for vuln data`,
+  mac:`wpscan --url {{URL:http://10.0.0.5}} --enumerate u,vp   # add --api-token for vuln data`
+ }},
+
+/* --- SMB / NetBIOS / SNMP / RPC --- */
+{id:"recon-smb-shares", cat:"Reconnaissance", title:"SMB share enumeration",
+ desc:"List SMB shares over a null session. smbclient (mac/linux) or native net view (Windows).",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","smb","enumeration"], attack:["T1135"],
+ detect:"Anonymous/guest SMB session then share enumeration; Windows events 5140/5145.",
+ mitigate:"Disable null/guest sessions; require SMB signing; restrict share access.",
+ code:{
+  linux:`smbclient -L //{{IP:10.0.0.5}}/ -N   # or: nmap --script smb-enum-shares -p445 {{IP:10.0.0.5}}`,
+  mac:`smbclient -L //{{IP:10.0.0.5}}/ -N`,
+  ps:`net view \\\\{{IP:10.0.0.5}} /all`
+ }},
+{id:"recon-smb-enum", cat:"Reconnaissance", title:"SMB / host enumeration (enum4linux-ng)",
+ desc:"Enumerate users, groups, shares, and policy over SMB/RPC/LDAP. Requires enum4linux-ng.",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","smb","enumeration","active-directory"], attack:["T1087","T1135"],
+ detect:"Bursts of SMB/RPC/LDAP queries (users, groups, shares, policy) from one host in seconds.",
+ mitigate:"Disable null sessions; restrict anonymous LDAP; SMB signing; monitor RPC/LDAP enum.",
+ code:{
+  linux:`enum4linux-ng -A {{IP:10.0.0.5}}`
+ }},
+{id:"recon-nbtscan", cat:"Reconnaissance", title:"NetBIOS name scan",
+ desc:"Query NetBIOS names/roles across a range. nmblookup (samba) or nbtscan.",
+ danger:"Authorized networks only.",
+ team:"red", tags:["recon","smb","discovery"], attack:["T1018"],
+ detect:"UDP/137 NetBIOS name queries across many hosts from one source.",
+ mitigate:"Disable NetBIOS over TCP/IP where unused; filter UDP/137 at boundaries.",
+ code:{
+  linux:`nmblookup -A {{IP:10.0.0.5}}   # or: nbtscan {{TARGET:10.0.0.0/24}}`,
+  mac:`nmblookup -A {{IP:10.0.0.5}}`,
+  ps:`nbtstat -A {{IP:10.0.0.5}}`
+ }},
+{id:"recon-snmp-walk", cat:"Reconnaissance", title:"SNMP enumeration",
+ desc:"Walk SNMP with a community string to pull system, interface, and process data. Requires net-snmp.",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","snmp","enumeration"], attack:["T1046"],
+ detect:"SNMP GET/WALK with default community strings from non-management hosts; UDP/161 spikes.",
+ mitigate:"Use SNMPv3 (auth+priv); change/remove default communities; restrict UDP/161 by ACL.",
+ code:{
+  linux:`snmpwalk -v2c -c {{COMMUNITY:public}} {{IP:10.0.0.5}}`,
+  mac:`snmpwalk -v2c -c {{COMMUNITY:public}} {{IP:10.0.0.5}}`
+ }},
+{id:"recon-rpc-enum", cat:"Reconnaissance", title:"RPC user/group enumeration",
+ desc:"Use a null RPC session to list domain users and groups. Requires samba (rpcclient).",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","smb","enumeration","active-directory"], attack:["T1087"],
+ detect:"SAMR/LSARPC queries over a null session (enumdomusers/enumdomgroups) at the DC.",
+ mitigate:"Restrict anonymous RPC; RestrictAnonymous/RestrictRemoteSAM; monitor SAMR enum.",
+ code:{
+  linux:`rpcclient -U "" -N {{IP:10.0.0.5}} -c "enumdomusers;enumdomgroups"`,
+  mac:`rpcclient -U "" -N {{IP:10.0.0.5}} -c "enumdomusers;enumdomgroups"`
+ }},
+
+/* --- services / mail / OSINT --- */
+{id:"recon-banner-grab", cat:"Reconnaissance", title:"Banner grabbing",
+ desc:"Connect to a port and read the service banner with netcat.",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","network","banner","quick-win"], attack:["T1046"],
+ detect:"Raw TCP connects that read the banner then disconnect; many short-lived sessions.",
+ mitigate:"Suppress/normalize service banners; alert on connect-and-drop patterns.",
+ code:{
+  linux:`nc -nv {{IP:10.0.0.5}} {{PORT:22}}`,
+  mac:`nc -nv {{IP:10.0.0.5}} {{PORT:22}}`
+ }},
+{id:"recon-smtp-userenum", cat:"Reconnaissance", title:"SMTP user enumeration (VRFY)",
+ desc:"Probe an SMTP server with VRFY to test which usernames exist.",
+ danger:"Authorized targets only.",
+ team:"red", tags:["recon","mail","enumeration"], attack:["T1087"],
+ detect:"Many SMTP VRFY/EXPN/RCPT probes from one source; mail logs show user enumeration.",
+ mitigate:"Disable VRFY/EXPN; return generic responses; rate-limit; tarpit.",
+ code:{
+  linux:`for u in root admin test info; do printf "VRFY %s\\r\\n" "$u" | nc -w2 {{IP:10.0.0.5}} 25; done`,
+  mac:`for u in root admin test info; do printf "VRFY %s\\r\\n" "$u" | nc -w2 {{IP:10.0.0.5}} 25; done`
+ }},
+{id:"recon-whois", cat:"Reconnaissance", title:"WHOIS / registration lookup",
+ desc:"Look up domain/IP registration, registrar, and org data. Native whois on mac/linux.",
+ danger:"OSINT — scope to authorized engagements; queries registries, not the target.",
+ team:"red", tags:["recon","osint","dns"], attack:["T1590.001"],
+ detect:"Passive — invisible to the target.",
+ mitigate:"Use WHOIS/registration privacy; minimize org data in public records.",
+ code:{
+  linux:`whois {{DOMAIN:example.com}}`,
+  mac:`whois {{DOMAIN:example.com}}`,
+  ps:`Invoke-RestMethod "https://rdap.org/domain/{{DOMAIN:example.com}}"`
+ }},
+{id:"recon-theharvester", cat:"Reconnaissance", title:"Email & host OSINT (theHarvester)",
+ desc:"Gather emails, hosts, and subdomains from public sources. Requires theHarvester.",
+ danger:"OSINT — scope to authorized engagements; uses third-party data, not the target.",
+ team:"red", tags:["recon","osint","subdomain","mail"], attack:["T1589.002"],
+ detect:"Passive — invisible to the target; reduce exposure of employee emails/hosts publicly.",
+ mitigate:"Limit public email exposure; awareness training; monitor for your data in breach dumps.",
+ code:{
+  linux:`theHarvester -d {{DOMAIN:example.com}} -b bing,crtsh,duckduckgo`,
+  mac:`theHarvester -d {{DOMAIN:example.com}} -b bing,crtsh,duckduckgo`
+ }},
+{id:"recon-shodan", cat:"Reconnaissance", title:"Shodan host lookup",
+ desc:"Query Shodan's scan database for a host's exposed services. Requires the shodan CLI + API key.",
+ danger:"OSINT — scope to authorized engagements; reads a third-party database, not the target.",
+ team:"red", tags:["recon","osint","network"], attack:["T1596.005"],
+ detect:"Passive — invisible to the target; monitor your own external attack surface for exposure.",
+ mitigate:"Reduce internet-exposed services; request removal; continuous EASM monitoring.",
+ code:{
+  linux:`shodan host {{IP:10.0.0.5}}   # first run: shodan init <API_KEY>`,
+  mac:`shodan host {{IP:10.0.0.5}}   # first run: shodan init <API_KEY>`
+ }},
+
 /* ================= TOOLS ================= */
 {id:"tool-nmap", cat:"Tools", title:"Nmap",
  desc:"Network mapper — host discovery, port/service/OS fingerprinting.",
