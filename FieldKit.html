@@ -87,6 +87,38 @@
   .chip.py{color:#e8cf6b; border-color:#6b5f2c}
   .chip.dork{color:#e0a35c; border-color:#6b4a2c}
   .chip.sql{color:#6fb7c9; border-color:#2f5a66}
+  .chip.tool{color:#e3a83f; border-color:#6b5220}
+  .teamdot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle}
+  .teamdot.red{background:#d9744f} .teamdot.blue{background:#4f96d9} .teamdot.purple{background:#a86fd0}
+  /* extended-schema detail: team / attack / tags / detect-mitigate / placeholders / tools */
+  .badges{margin-top:11px; display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+  .team{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; padding:2px 9px; border-radius:10px; border:1px solid}
+  .team.red{color:#e08a7a; border-color:#7a3a2c; background:rgba(217,116,79,.09)}
+  .team.blue{color:#7ab6e0; border-color:#2c5a7a; background:rgba(79,150,217,.09)}
+  .team.purple{color:#c79ad9; border-color:#5a3a7a; background:rgba(150,79,217,.09)}
+  a.att{font-family:var(--mono); font-size:10px; color:var(--teal); border:1px solid #2f5a5f; border-radius:4px; padding:2px 6px; text-decoration:none}
+  a.att:hover{background:rgba(87,182,189,.12)}
+  .tagrow{margin-top:9px; display:flex; gap:5px; flex-wrap:wrap}
+  .tag{font-family:var(--mono); font-size:10px; color:var(--muted); background:var(--panel2); border:1px solid var(--edge2); border-radius:10px; padding:2px 8px}
+  .phbar{display:flex; gap:10px; flex-wrap:wrap; padding:12px 22px 0}
+  .phf{display:flex; flex-direction:column; gap:3px}
+  .phf label{font-family:var(--mono); font-size:10px; letter-spacing:.5px; color:var(--faint); text-transform:uppercase}
+  .phf input{background:var(--bg); border:1px solid var(--edge); border-radius:5px; color:var(--amber); font-family:var(--mono); font-size:12px; padding:6px 9px; outline:none; min-width:150px}
+  .phf input:focus{border-color:var(--amber-dim)}
+  .dm{margin:2px 22px 22px; display:flex; flex-direction:column; gap:8px}
+  .dm-row{display:flex; gap:11px; font-size:12.5px; line-height:1.5; color:var(--muted); background:var(--panel); border:1px solid var(--edge); border-radius:6px; padding:10px 12px}
+  .dm-k{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; flex:none; width:64px; padding-top:1px}
+  .dm-k.detect{color:#7ab6e0} .dm-k.mitigate{color:#7fb069}
+  .toolmeta{display:flex; gap:16px; flex-wrap:wrap; align-items:center; padding:16px 22px; font-size:12.5px; color:var(--muted)}
+  .toolmeta a.site{color:var(--amber); text-decoration:none; border:1px solid var(--amber-dim); border-radius:6px; padding:7px 12px; font-family:var(--mono); font-size:12px}
+  .toolmeta a.site:hover{background:rgba(227,168,63,.1)}
+  .plat{font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.5px; border:1px solid var(--edge2); border-radius:4px; padding:2px 6px; color:var(--muted); margin-left:4px}
+  .insthdr{font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--faint); padding:0 22px 8px}
+  .inst{margin:0 22px 22px; border:1px solid var(--edge); border-radius:6px; overflow:hidden}
+  .inst-row{display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge); background:var(--panel2)}
+  .inst-row:last-child{border-bottom:0}
+  .inst-os{font-family:var(--mono); font-size:11px; color:var(--faint); flex:none; width:64px}
+  .inst-cmd{font-family:var(--mono); font-size:12px; color:#dfe6ee; overflow-x:auto; white-space:pre; flex:1}
   .empty{padding:40px 20px; text-align:center; color:var(--faint); font-size:13px}
   /* detail */
   .detail{overflow-y:auto; background:var(--bg); display:flex; flex-direction:column}
@@ -258,13 +290,17 @@ let selectedLang = null;
 const $ = s => document.querySelector(s);
 const railEl=$("#rail"), listEl=$("#list"), detailEl=$("#detail");
 
-function langsOf(item){ return Object.keys(LANGS).filter(l=>item.code[l]); }
+function langsOf(item){ return item.code ? Object.keys(LANGS).filter(l=>item.code[l]) : []; }
+function isTool(item){ return !item.code && !!(item.install || item.url); }
 
 function matches(item){
   if(activeCat!=="All" && item.cat!==activeCat) return false;
-  if(activeLangFilter!=="all" && !item.code[activeLangFilter]) return false;
+  if(activeLangFilter!=="all" && !(item.code && item.code[activeLangFilter])) return false;
   if(query){
-    const hay=(item.title+" "+item.desc+" "+item.cat+" "+Object.values(item.code).join(" ")).toLowerCase();
+    const codeText = item.code ? Object.values(item.code).join(" ")
+                   : item.install ? Object.values(item.install).join(" ") : "";
+    const hay=[item.title, item.desc, item.cat, (item.tags||[]).join(" "),
+               (item.attack||[]).join(" "), codeText].join(" ").toLowerCase();
     if(!hay.includes(query)) return false;
   }
   return true;
@@ -293,9 +329,12 @@ function renderList(){
     return;
   }
   listEl.innerHTML=items.map(i=>{
-    const chips=langsOf(i).map(l=>`<span class="chip ${l}">${LANGS[l].tag}</span>`).join("");
+    const chips = isTool(i)
+      ? `<span class="chip tool">TOOL</span>`
+      : langsOf(i).map(l=>`<span class="chip ${l}">${LANGS[l].tag}</span>`).join("");
+    const team = i.team ? `<span class="teamdot ${i.team}" title="${esc(i.team)} team"></span>` : "";
     return `<div class="item ${i.id===selectedId?'on':''}" data-id="${i.id}">
-      <div class="t">${esc(i.title)}</div>
+      <div class="t">${team}${esc(i.title)}</div>
       <div class="d">${esc(i.desc)}</div>
       <div class="chips">${chips}</div>
     </div>`;
@@ -310,14 +349,49 @@ function select(id){
   const item=library.find(i=>i.id===id);
   const avail=langsOf(item);
   // honor the global language filter if that language exists here
-  selectedLang = (activeLangFilter!=="all" && item.code[activeLangFilter]) ? activeLangFilter : avail[0];
+  selectedLang = (activeLangFilter!=="all" && item.code && item.code[activeLangFilter]) ? activeLangFilter : avail[0];
   renderList();
   renderDetail();
+}
+
+/* ---------- extended-schema helpers ---------- */
+const PLACEHOLDER_RE=/\{\{([A-Za-z0-9_]+)(?::([^}]*))?\}\}/g;
+function parsePlaceholders(text){
+  const seen={}, out=[]; let m; PLACEHOLDER_RE.lastIndex=0;
+  while((m=PLACEHOLDER_RE.exec(text))){ if(!(m[1] in seen)){ seen[m[1]]=true; out.push({name:m[1], def:m[2]||""}); } }
+  return out;
+}
+function fillTemplate(text, values){
+  return text.replace(PLACEHOLDER_RE,(_,name,def)=>{
+    const v=values[name];
+    return (v!==undefined && v!=="") ? v : (def||"");
+  });
+}
+function teamBadge(item){ return item.team ? `<span class="team ${esc(item.team)}">${esc(item.team)}</span>` : ""; }
+function attackBadges(item){
+  return (item.attack||[]).map(t=>
+    `<a class="att" href="https://attack.mitre.org/techniques/${encodeURIComponent(String(t).replace('.','/'))}/" target="_blank" rel="noopener">${esc(t)}</a>`
+  ).join("");
+}
+function tagChips(item){
+  return (item.tags&&item.tags.length) ? `<div class="tagrow">${item.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>` : "";
+}
+function headBlock(item){
+  const badges=(teamBadge(item)||attackBadges(item)) ? `<div class="badges">${teamBadge(item)}${attackBadges(item)}</div>` : "";
+  return `<div class="head">
+      <div class="cat-tag">${esc(item.cat)}</div>
+      <h2>${esc(item.title)}</h2>
+      <div class="desc">${esc(item.desc)}</div>
+      ${item.danger?`<div class="warn">⚠ ${esc(item.danger)}</div>`:""}
+      ${badges}
+      ${tagChips(item)}
+    </div>`;
 }
 
 function renderDetail(){
   const item=library.find(i=>i.id===selectedId);
   if(!item){ return; }
+  if(isTool(item)) return renderToolDetail(item);
   const avail=langsOf(item);
   const CORE=['ps','cmd','mac','linux','py'];
   // OS commands show all five OS tabs (greying out unsupported ones); non-OS
@@ -329,15 +403,20 @@ function renderDetail(){
     return `<div class="tab ${on?'on':''} ${ok?'':'disabled'}" data-l="${l}">${LANGS[l].name}</div>`;
   }).join("");
   const meta=LANGS[selectedLang];
+  const raw=item.code[selectedLang];
+  const phs=parsePlaceholders(raw);
+  const phValues={}; phs.forEach(p=>phValues[p.name]=p.def);
   const fname=`${slug(item.title)}.${meta.ext}`;
+  const phbar=phs.length ? `<div class="phbar">${phs.map(p=>
+    `<div class="phf"><label>${esc(p.name)}</label><input data-ph="${esc(p.name)}" value="${esc(p.def)}" spellcheck="false"></div>`).join("")}</div>` : "";
+  const dm=(item.detect||item.mitigate) ? `<div class="dm">
+      ${item.detect?`<div class="dm-row"><span class="dm-k detect">Detect</span><span>${esc(item.detect)}</span></div>`:""}
+      ${item.mitigate?`<div class="dm-row"><span class="dm-k mitigate">Mitigate</span><span>${esc(item.mitigate)}</span></div>`:""}
+    </div>` : "";
   detailEl.innerHTML=`
-    <div class="head">
-      <div class="cat-tag">${esc(item.cat)}</div>
-      <h2>${esc(item.title)}</h2>
-      <div class="desc">${esc(item.desc)}</div>
-      ${item.danger?`<div class="warn">⚠ ${esc(item.danger)}</div>`:""}
-    </div>
+    ${headBlock(item)}
     <div class="tabs">${tabs}</div>
+    ${phbar}
     <div class="codewrap">
       <div class="codebar">
         <span class="fname">${fname}</span>
@@ -348,15 +427,42 @@ function renderDetail(){
         </span>
       </div>
       <pre id="codeEl"></pre>
-    </div>`;
-  $("#codeEl").textContent=item.code[selectedLang];
+    </div>
+    ${dm}`;
+  const paint=()=>{ $("#codeEl").textContent=fillTemplate(raw, phValues); };
+  paint();
+  detailEl.querySelectorAll(".phf input").forEach(inp=>{
+    inp.oninput=()=>{ phValues[inp.dataset.ph]=inp.value; paint(); };
+  });
   detailEl.querySelectorAll(".tab").forEach(t=>{
     if(t.classList.contains("disabled")) return;
     t.onclick=()=>{ selectedLang=t.dataset.l; renderDetail(); };
   });
   $("#editBtn").onclick=()=>openModal(item.id);
-  $("#copyBtn").onclick=()=>copyText(item.code[selectedLang], $("#copyBtn"));
-  $("#dlBtn").onclick=()=>download(fname, item.code[selectedLang]);
+  $("#copyBtn").onclick=()=>copyText(fillTemplate(raw, phValues), $("#copyBtn"));
+  $("#dlBtn").onclick=()=>download(fname, fillTemplate(raw, phValues));
+}
+
+function renderToolDetail(item){
+  const OS={cmd:"Windows", mac:"macOS", linux:"Linux"};
+  const plats=(item.platforms||[]).map(p=>`<span class="plat">${esc(p)}</span>`).join("");
+  const site=item.url ? `<a class="site" href="${esc(item.url)}" target="_blank" rel="noopener">Open official site ↗</a>` : "";
+  const inst=item.install ? `<div class="inst">${Object.entries(item.install).map(([k,v])=>
+    `<div class="inst-row">
+       <span class="inst-os">${esc(OS[k]||k)}</span>
+       <span class="inst-cmd">${esc(v)}</span>
+       <button class="act inst-copy" data-cmd="${esc(v)}">Copy</button>
+     </div>`).join("")}</div>` : "";
+  detailEl.innerHTML=`
+    ${headBlock(item)}
+    <div class="toolmeta">
+      ${site}
+      ${item.license?`<span>License: ${esc(item.license)}</span>`:""}
+      ${plats?`<span>Platforms: ${plats}</span>`:""}
+    </div>
+    ${item.install?`<div class="insthdr">Install</div>`:""}
+    ${inst}`;
+  detailEl.querySelectorAll(".inst-copy").forEach(b=>{ b.onclick=()=>copyText(b.dataset.cmd, b); });
 }
 
 /* ---------- clipboard (works from file://) ---------- */
@@ -418,8 +524,10 @@ $("#m-save").onclick=()=>{
   if(!title){ alert("Give it a task name."); return; }
   if(!Object.keys(code).length){ alert("Add code for at least one target (OS or search)."); return; }
   const isOverride = editingId && !String(editingId).startsWith("custom-");
-  const entry={ id: editingId || ("custom-"+Date.now()), cat, title, desc, code, custom:true };
-  if(danger) entry.danger=danger;
+  const existing = editingId ? library.find(i=>i.id===editingId) : null;
+  // spread existing first so extended fields (team/tags/attack/detect/mitigate) survive an edit
+  const entry={ ...(existing||{}), id: editingId || ("custom-"+Date.now()), cat, title, desc, code, custom:true };
+  if(danger) entry.danger=danger; else delete entry.danger;
   if(isOverride) entry.override=true;                            // an edited built-in
   const idx=library.findIndex(i=>i.id===entry.id);
   if(idx===-1) library.push(entry); else library[idx]=entry;
