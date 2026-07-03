@@ -88,12 +88,25 @@
   }
   .cat{
     display:flex; justify-content:space-between; align-items:center; gap:6px;
-    padding:8px 16px; cursor:pointer; color:var(--muted); border-left:2px solid transparent;
+    padding:6px 16px 6px 26px; cursor:pointer; color:var(--muted); border-left:2px solid transparent;
+    font-size:13px;
   }
+  .cat.top{padding-left:16px}
   .cat:hover{color:var(--ink); background:var(--panel2)}
   .cat.on{color:var(--ink); border-left-color:var(--amber); background:var(--panel2)}
   .cat .n{font-family:var(--mono); font-size:11px; color:var(--faint)}
   .cat.on .n{color:var(--amber)}
+  /* rail domain group headers */
+  .domain{
+    display:flex; justify-content:space-between; align-items:center; gap:6px;
+    padding:11px 16px 5px; cursor:pointer; user-select:none;
+    font-family:var(--mono); font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--faint);
+  }
+  .domain:hover{color:var(--muted)}
+  .domain .dom-t::before{content:"\25B8"; margin-right:6px; display:inline-block; font-size:9px}
+  .domain.open .dom-t::before{content:"\25BE"}
+  .domain.active .dom-t{color:var(--amber)}
+  .domain .dom-n{font-size:10px; opacity:.55}
   /* list */
   .list{border-right:1px solid var(--edge); overflow-y:auto; background:var(--bg)}
   .item{padding:12px 16px; border-bottom:1px solid var(--edge); cursor:pointer}
@@ -374,6 +387,22 @@ let activeTags = new Set();
 let tagsExpanded = false;
 const TAG_CAP = 20;
 
+// category rail grouped into collapsible domains (order matters; any category
+// not listed falls into an auto "Other" group so nothing is ever hidden)
+const DOMAINS = [
+  ["Recon & OSINT", ["Reconnaissance","OSINT","Enumeration","Google Dorks","Network"]],
+  ["Offensive", ["Active Directory Attacks","Exploitation Frameworks","Password Auditing","Post-Exploitation","Privilege-Escalation Enumeration","Web App Testing","Wireless Auditing"]],
+  ["Defense, IR & Forensics", ["Detection Engineering","Incident Response & Live Triage","Event Logs","Forensics","Security","Backup & Recovery"]],
+  ["Windows & Endpoint", ["Windows Registry","Users & Access","Processes & Services","System Info","Disk & Files","Active Directory","Remote Management","Scheduled Tasks & Automation","Maintenance"]],
+  ["Infra & Cloud", ["Cloud CLI","Containers","Package Managers","File Transfer & Sync","Certificates & TLS"]],
+  ["Data & Dev", ["Python Examples","SQL","Regex & Text Processing","Git Recovery"]],
+  ["Tools & Reference", ["Tools"]],
+];
+const COLLAPSE_KEY = "fieldkit.railcollapse.v1";
+let collapsedDomains = new Set();
+function loadCollapsed(){ try{ collapsedDomains = new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY)||"[]")); }catch(e){ collapsedDomains = new Set(); } }
+function saveCollapsed(){ try{ localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsedDomains])); }catch(e){} }
+
 const THEME_KEY = "fieldkit.theme.v1";
 const THEMES = ["amber","slate","paper","contrast","green"];
 function applyTheme(name){
@@ -421,29 +450,62 @@ function matchesBase(item, opts){
 function matches(item){ return matchesBase(item); }
 
 function renderRail(){
-  const cats=[...new Set(library.map(i=>i.cat))];
+  const present=new Set(library.map(i=>i.cat));
+  const cats=[...present];
   const counts=c=> c==="All" ? library.length : c==="__fav" ? favorites.size : library.filter(i=>i.cat===c).length;
   let html=`<h4>Categories</h4>`;
-  html+=railItem("All","All");
-  if(favorites.size) html+=railItem("__fav","★ Favorites");
-  cats.forEach(c=>html+=railItem(c,c));
+  html+=railItem("All","All","top");
+  if(favorites.size) html+=railItem("__fav","★ Favorites","top");
+  // grouped domains
+  const mapped=new Set();
+  DOMAINS.forEach(([dom,list])=>{
+    const inDom=list.filter(c=>present.has(c));
+    if(!inDom.length) return;
+    inDom.forEach(c=>mapped.add(c));
+    html+=domainHeader(dom, inDom);
+    if(!collapsedDomains.has(dom)) html+=inDom.map(c=>railItem(c,c)).join("");
+  });
+  const other=cats.filter(c=>!mapped.has(c));
+  if(other.length){
+    html+=domainHeader("Other", other);
+    if(!collapsedDomains.has("Other")) html+=other.map(c=>railItem(c,c)).join("");
+  }
   railEl.innerHTML=html;
   railEl.querySelectorAll(".cat").forEach(el=>{
     el.onclick=()=>{ activeCat=el.dataset.c; tagsExpanded=false; renderRail(); renderList(); };
   });
-  // mobile category selector mirrors the rail (rail is hidden < 900px)
+  railEl.querySelectorAll(".domain").forEach(el=>{
+    const toggle=()=>{ const dom=el.dataset.dom; collapsedDomains.has(dom)?collapsedDomains.delete(dom):collapsedDomains.add(dom); saveCollapsed(); renderRail(); };
+    el.onclick=toggle;
+    el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(); } };
+  });
+  // mobile category selector mirrors the rail (rail is hidden < 900px), grouped with <optgroup>
   const sel=$("#catSel");
   if(sel){
     const opt=(v,label)=>`<option value="${esc(v)}" ${v===activeCat?"selected":""}>${esc(label)}</option>`;
     let o=opt("All",`All (${library.length})`);
     if(favorites.size) o+=opt("__fav",`★ Favorites (${favorites.size})`);
-    cats.forEach(c=>o+=opt(c,`${c} (${counts(c)})`));
+    const seen=new Set();
+    DOMAINS.forEach(([dom,list])=>{
+      const inDom=list.filter(c=>present.has(c)); if(!inDom.length) return;
+      inDom.forEach(c=>seen.add(c));
+      o+=`<optgroup label="${esc(dom)}">`+inDom.map(c=>opt(c,`${c} (${counts(c)})`)).join("")+`</optgroup>`;
+    });
+    const rest=cats.filter(c=>!seen.has(c));
+    if(rest.length) o+=`<optgroup label="Other">`+rest.map(c=>opt(c,`${c} (${counts(c)})`)).join("")+`</optgroup>`;
     sel.innerHTML=o;
   }
   renderTagBar();
-  function railItem(c,label){
-    return `<div class="cat ${c===activeCat?'on':''}" data-c="${c}">
+  function railItem(c,label,cls){
+    return `<div class="cat ${cls||''} ${c===activeCat?'on':''}" data-c="${c}">
       <span>${esc(label)}</span><span class="n">${counts(c)}</span></div>`;
+  }
+  function domainHeader(dom, inDom){
+    const n=inDom.reduce((a,c)=>a+counts(c),0);
+    const open=!collapsedDomains.has(dom);
+    const active=inDom.includes(activeCat);
+    return `<div class="domain ${open?'open':''} ${active?'active':''}" data-dom="${esc(dom)}" role="button" tabindex="0" aria-expanded="${open}">
+      <span class="dom-t">${esc(dom)}</span><span class="dom-n">${n}</span></div>`;
   }
 }
 
@@ -1062,6 +1124,7 @@ window.addEventListener("hashchange",()=>{
 
 /* ---------- boot ---------- */
 loadTheme();
+loadCollapsed();
 loadFavorites();
 loadLocalCustoms();
 renderRail();

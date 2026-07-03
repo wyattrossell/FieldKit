@@ -22,9 +22,11 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
 - **Interactive generators** — built-in widgets such as the **Crontab Generator**: pick a
   preset or set each field, get the cron expression, a plain-English summary, and a
   ready-to-paste `crontab` install line.
-- **Filters** — category rail, **team filter** (blue / red / purple), language, full-text
-  search, and **context-aware tag chips** (the tag bar shows only the tags present in your
-  current view, so it never becomes a wall of 60 chips).
+- **Filters** — a **collapsible category rail** grouped into domains (Recon & OSINT, Offensive,
+  Defense/IR/Forensics, Windows & Endpoint, Infra & Cloud, Data & Dev, Tools & Reference), a
+  **team filter** (blue / red / purple), language, full-text search, and **context-aware tag
+  chips** (the tag bar shows only the tags present in your current view, so it never becomes a
+  wall of 60 chips).
 - **Related / next steps** — entries can link to the logical follow-on tasks (e.g. triage
   snapshot → hash processes → persistence sweep), so common workflows chain without leaving
   the detail pane.
