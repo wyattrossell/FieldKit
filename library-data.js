@@ -1,0 +1,2699 @@
+/* FieldKit — command library data.
+   Loaded by FieldKit.html via <script src="library-data.js">, which works from
+   file:// (a fetched .json would be blocked). Sets window.FIELDKIT_LIBRARY.
+   Schema + how to add entries: see CONTRIBUTING.md. */
+window.FIELDKIT_LIBRARY = [
+/* ---------- SYSTEM INFO ---------- */
+{id:"sys-summary", cat:"System Info", title:"System & hardware summary",
+ desc:"OS, model, CPU, and architecture at a glance.",
+ code:{
+  ps:`Get-CimInstance Win32_OperatingSystem |
+  Select-Object CSName, Caption, Version, OSArchitecture, @{n='InstalledRAM_GB';e={[math]::Round($_.TotalVisibleMemorySize/1MB,1)}}
+Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer, Model
+Get-CimInstance Win32_Processor  | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors`,
+  cmd:`systeminfo | findstr /C:"OS Name" /C:"OS Version" /C:"System Manufacturer" /C:"System Model" /C:"System Type" /C:"Total Physical Memory"`,
+  py:`import platform, socket
+print("Host      :", socket.gethostname())
+print("OS        :", platform.system(), platform.release())
+print("Version   :", platform.version())
+print("Machine   :", platform.machine())
+print("Processor :", platform.processor())`,
+  mac:`echo "Host : $(hostname)"
+sw_vers
+echo "Model: $(sysctl -n hw.model)"
+sysctl -n machdep.cpu.brand_string
+echo "Cores: $(sysctl -n hw.ncpu)  Arch: $(uname -m)"`,
+  linux:`echo "Host : $(hostname)"
+uname -a
+[ -r /etc/os-release ] && . /etc/os-release && echo "OS   : $PRETTY_NAME"
+lscpu | grep -E 'Model name|^CPU\\(s\\)|Architecture'`
+ }},
+{id:"sys-uptime", cat:"System Info", title:"Uptime / last boot",
+ desc:"How long the machine has been running since last boot.",
+ code:{
+  ps:`$b=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+"Last boot : $b"
+"Uptime    : {0:dd}d {0:hh}h {0:mm}m" -f ((Get-Date)-$b)`,
+  cmd:`net statistics workstation | find "Statistics since"`,
+  mac:`uptime
+# last boot as a date:
+date -r $(sysctl -n kern.boottime | sed -E 's/.*sec = ([0-9]+).*/\\1/')`,
+  linux:`uptime -p
+echo "Since: $(uptime -s)"`,
+  py:`import subprocess, sys
+# Standard-lib friendly: read boot time from /proc on Linux
+try:
+    with open('/proc/uptime') as f:
+        secs=float(f.read().split()[0])
+    print(f"Uptime: {int(secs//86400)}d {int(secs%86400//3600)}h {int(secs%3600//60)}m")
+except FileNotFoundError:
+    print("Run on Linux, or use: import psutil; psutil.boot_time()")`
+ }},
+{id:"sys-serial", cat:"System Info", title:"Serial number / asset tag",
+ desc:"Pull the BIOS serial for asset tracking or warranty lookup.",
+ code:{
+  ps:`Get-CimInstance Win32_BIOS | Select-Object Manufacturer, SerialNumber, SMBIOSBIOSVersion
+Get-CimInstance Win32_ComputerSystemProduct | Select-Object Name, IdentifyingNumber`,
+  cmd:`wmic bios get serialnumber
+wmic csproduct get name,identifyingnumber`,
+  mac:`system_profiler SPHardwareDataType |
+  awk -F': ' '/Serial Number|Model Identifier|Hardware UUID/{print $1": "$2}'`,
+  linux:`sudo dmidecode -s system-serial-number
+sudo dmidecode -s system-product-name`
+ }},
+
+/* ---------- NETWORK ---------- */
+{id:"net-ipconfig", cat:"Network", title:"IP configuration (all adapters)",
+ desc:"Addresses, gateways, DNS servers, and MACs for every interface.",
+ code:{
+  ps:`Get-NetIPConfiguration | Format-List InterfaceAlias, IPv4Address, IPv4DefaultGateway, DNSServer
+Get-NetAdapter | Select-Object Name, Status, MacAddress, LinkSpeed`,
+  cmd:`ipconfig /all`,
+  mac:`ifconfig | grep -E '^[a-z]|inet '
+echo "-- routes --"; netstat -rn | grep -E '^default'
+echo "-- dns --"; scutil --dns | awk '/nameserver/{print $3}' | sort -u`,
+  linux:`ip -brief addr
+echo "-- routes --"; ip route
+echo "-- dns --"; resolvectl status 2>/dev/null | grep 'DNS Server' || cat /etc/resolv.conf`,
+  py:`import socket
+host=socket.gethostname()
+print("Host:", host)
+print("Primary IP:", socket.gethostbyname(host))
+for res in socket.getaddrinfo(host, None):
+    print(res[4][0])`
+ }},
+{id:"net-public-ip", cat:"Network", title:"Public / WAN IP address",
+ desc:"Ask an external service what IP the internet sees you as.",
+ code:{
+  ps:`(Invoke-RestMethod -Uri 'https://ifconfig.me/ip').Trim()`,
+  cmd:`curl -s https://ifconfig.me`,
+  mac:`curl -s https://ifconfig.me; echo`,
+  linux:`curl -s https://ifconfig.me; echo`,
+  py:`import urllib.request
+print(urllib.request.urlopen("https://ifconfig.me/ip", timeout=6).read().decode().strip())`
+ }},
+{id:"net-ping-sweep", cat:"Network", title:"Ping sweep a /24 subnet",
+ desc:"Find live hosts on a local subnet. Set the base to your network.",
+ code:{
+  ps:`$base='192.168.1'
+1..254 | ForEach-Object {
+  if (Test-Connection "$base.$_" -Count 1 -Quiet -TimeoutSeconds 1) { "$base.$_  UP" }
+}`,
+  cmd:`@echo off
+set base=192.168.1
+for /L %%i in (1,1,254) do @ping -n 1 -w 200 %base%.%%i | find "TTL=" >nul && echo %base%.%%i UP`,
+  mac:`base=192.168.1
+for i in $(seq 1 254); do
+  ping -c1 -t1 "\${base}.\${i}" >/dev/null 2>&1 && echo "\${base}.\${i} UP" &
+done; wait`,
+  linux:`base=192.168.1
+for i in $(seq 1 254); do
+  ping -c1 -W1 "\${base}.\${i}" >/dev/null 2>&1 && echo "\${base}.\${i} UP" &
+done; wait`,
+  py:`import subprocess, platform, concurrent.futures as cf
+base="192.168.1"
+flag="-n" if platform.system()=="Windows" else "-c"
+def up(i):
+    ip=f"{base}.{i}"
+    r=subprocess.run(["ping",flag,"1",ip],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    return ip if r.returncode==0 else None
+with cf.ThreadPoolExecutor(max_workers=64) as ex:
+    for ip in filter(None, ex.map(up, range(1,255))):
+        print(ip, "UP")`
+ }},
+{id:"net-port-check", cat:"Network", title:"Check if a TCP port is open",
+ desc:"Test reachability of host:port — quick service-up check.",
+ code:{
+  ps:`Test-NetConnection -ComputerName example.com -Port 443 |
+  Select-Object ComputerName, RemotePort, TcpTestSucceeded`,
+  mac:`host=example.com; port=443
+# BSD nc: -G connect timeout (s)
+nc -z -G3 "$host" "$port" && echo OPEN || echo CLOSED`,
+  linux:`host=example.com; port=443
+timeout 3 bash -c "</dev/tcp/\${host}/\${port}" && echo "OPEN" || echo "CLOSED"`,
+  py:`import socket
+host, port = "example.com", 443
+s=socket.socket(); s.settimeout(3)
+print("OPEN" if s.connect_ex((host,port))==0 else "CLOSED")
+s.close()`
+ }},
+{id:"net-listening", cat:"Network", title:"Listening ports + owning process",
+ desc:"What's accepting connections, and which PID owns it.",
+ code:{
+  ps:`Get-NetTCPConnection -State Listen |
+  Select-Object LocalAddress, LocalPort,
+    @{n='Process';e={(Get-Process -Id $_.OwningProcess).ProcessName}}, OwningProcess |
+  Sort-Object LocalPort`,
+  cmd:`netstat -ano | findstr LISTENING`,
+  mac:`sudo lsof -nP -iTCP -sTCP:LISTEN`,
+  linux:`ss -tulpn 2>/dev/null || sudo ss -tulpn`
+ }},
+{id:"net-dns", cat:"Network", title:"DNS lookup",
+ desc:"Resolve a hostname to its A/AAAA records.",
+ code:{
+  ps:`Resolve-DnsName example.com | Select-Object Name, Type, IPAddress`,
+  cmd:`nslookup example.com`,
+  mac:`dig +short example.com A AAAA || nslookup example.com`,
+  linux:`dig +short example.com A AAAA || nslookup example.com`,
+  py:`import socket
+name="example.com"
+for fam,_,_,_,addr in socket.getaddrinfo(name,None):
+    print(addr[0])`
+ }},
+{id:"net-arp", cat:"Network", title:"ARP / neighbor table",
+ desc:"Map local IPs to MAC addresses — spot devices on the LAN.",
+ code:{
+  ps:`Get-NetNeighbor -AddressFamily IPv4 |
+  Where-Object State -in 'Reachable','Stale' |
+  Select-Object IPAddress, LinkLayerAddress, State`,
+  cmd:`arp -a`,
+  mac:`arp -an`,
+  linux:`ip neigh show`
+ }},
+{id:"net-wifi-pw", cat:"Network", title:"Saved Wi-Fi profiles & keys (Windows)",
+ desc:"List stored wireless networks and reveal a saved passphrase.",
+ danger:"Only on machines you are authorized to service.",
+ code:{
+  cmd:`netsh wlan show profiles
+:: reveal one profile's key:
+netsh wlan show profile name="SSID_HERE" key=clear | findstr "Key Content"`,
+  ps:`(netsh wlan show profiles) |
+  Select-String ':\\s(.+)$' |
+  ForEach-Object {
+    $ssid=$_.Matches.Groups[1].Value.Trim()
+    $key=(netsh wlan show profile name="$ssid" key=clear |
+      Select-String 'Key Content\\s+:\\s(.+)$').Matches.Groups[1].Value
+    [pscustomobject]@{SSID=$ssid; Key=$key}
+  }`,
+  mac:`# reveal a saved Wi-Fi password from the keychain (prompts for admin):
+security find-generic-password -wa "SSID_HERE"   # set the SSID`,
+  linux:`# NetworkManager stores keys here (root):
+sudo grep -r '^psk=' /etc/NetworkManager/system-connections/ 2>/dev/null`
+ }},
+
+/* ---------- USERS & ACCESS ---------- */
+{id:"usr-list", cat:"Users & Access", title:"List local user accounts",
+ desc:"Enumerate local accounts and whether they're enabled.",
+ code:{
+  ps:`Get-LocalUser | Select-Object Name, Enabled, LastLogon, Description`,
+  cmd:`net user`,
+  mac:`# real (non-service) accounts hide the leading-underscore system users:
+dscl . -list /Users | grep -v '^_'`,
+  linux:`getent passwd | awk -F: '$3>=1000 && $3<65534 {print $1"  (uid "$3")"}'`
+ }},
+{id:"usr-admins", cat:"Users & Access", title:"List administrators / sudoers",
+ desc:"Who has elevated rights on this box.",
+ code:{
+  ps:`Get-LocalGroupMember -Group 'Administrators' |
+  Select-Object Name, ObjectClass, PrincipalSource`,
+  cmd:`net localgroup administrators`,
+  mac:`dscl . -read /Groups/admin GroupMembership`,
+  linux:`echo "sudo:";  getent group sudo  | cut -d: -f4
+echo "wheel:"; getent group wheel | cut -d: -f4`
+ }},
+{id:"usr-create", cat:"Users & Access", title:"Create a local user",
+ desc:"Add a standard local account. Edit the name before running.",
+ danger:"Modifies accounts — run only where authorized.",
+ code:{
+  ps:`$pw = Read-Host 'New password' -AsSecureString
+New-LocalUser -Name 'techuser' -Password $pw -FullName 'Field Tech' -Description 'Service account'`,
+  cmd:`net user techuser * /add`,
+  mac:`# -password - prompts interactively for the new password:
+sudo sysadminctl -addUser techuser -fullName "Field Tech" -password -`,
+  linux:`sudo useradd -m -s /bin/bash techuser
+sudo passwd techuser`
+ }},
+{id:"usr-mkadmin", cat:"Users & Access", title:"Grant admin / sudo to a user",
+ desc:"Add an existing account to the admin group.",
+ danger:"Privilege change — run only where authorized.",
+ code:{
+  ps:`Add-LocalGroupMember -Group 'Administrators' -Member 'techuser'`,
+  cmd:`net localgroup administrators techuser /add`,
+  mac:`sudo dseditgroup -o edit -a techuser -t user admin`,
+  linux:`sudo usermod -aG sudo techuser   # Debian/Ubuntu
+# sudo usermod -aG wheel techuser  # RHEL/Fedora`
+ }},
+{id:"usr-loggedon", cat:"Users & Access", title:"Who is logged on",
+ desc:"Current interactive and remote sessions.",
+ code:{
+  ps:`query user 2>$null
+Get-CimInstance Win32_LoggedOnUser | Select-Object -Expand Antecedent -Unique`,
+  cmd:`query user`,
+  mac:`who
+echo "-- active --"; w`,
+  linux:`who -u
+echo "-- active --"; w`
+ }},
+{id:"usr-amiadmin", cat:"Users & Access", title:"Am I admin / root?",
+ desc:"Check whether the current shell is elevated before you start.",
+ code:{
+  ps:`$p=[Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+if ($p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {'Elevated'} else {'NOT elevated'}`,
+  cmd:`net session >nul 2>&1 && echo Elevated || echo NOT elevated`,
+  mac:`[ "$(id -u)" -eq 0 ] && echo "root" || echo "not root"`,
+  linux:`[ "$(id -u)" -eq 0 ] && echo "root" || echo "not root"`,
+  py:`import os, ctypes
+try:
+    admin = ctypes.windll.shell32.IsUserAnAdmin() != 0   # Windows
+except AttributeError:
+    admin = (os.geteuid() == 0)                          # POSIX
+print("Elevated" if admin else "NOT elevated")`
+ }},
+
+/* ---------- DISK & FILES ---------- */
+{id:"disk-usage", cat:"Disk & Files", title:"Disk usage / free space",
+ desc:"Capacity and free space per volume.",
+ code:{
+  ps:`Get-Volume | Where-Object DriveLetter |
+  Select-Object DriveLetter, FileSystemLabel,
+    @{n='Size_GB';e={[math]::Round($_.Size/1GB,1)}},
+    @{n='Free_GB';e={[math]::Round($_.SizeRemaining/1GB,1)}}`,
+  cmd:`wmic logicaldisk get caption,volumename,size,freespace`,
+  mac:`df -h
+echo "-- volumes --"; diskutil list`,
+  linux:`df -hT -x tmpfs -x devtmpfs`,
+  py:`import shutil, string, os
+if os.name=="nt":
+    drives=[f"{d}:\\\\" for d in string.ascii_uppercase if os.path.exists(f"{d}:\\\\")]
+else:
+    drives=["/"]
+for d in drives:
+    t,u,f=shutil.disk_usage(d)
+    print(f"{d}  size {t//2**30}G  free {f//2**30}G")`
+ }},
+{id:"disk-large", cat:"Disk & Files", title:"Find the largest files",
+ desc:"Top space hogs under the current folder — cleanup triage.",
+ code:{
+  ps:`Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue |
+  Sort-Object Length -Descending | Select-Object -First 20 FullName,
+    @{n='MB';e={[math]::Round($_.Length/1MB,1)}}`,
+  mac:`du -ah . 2>/dev/null | sort -rh | head -20`,
+  linux:`du -ah . 2>/dev/null | sort -rh | head -20`,
+  py:`import os
+files=[]
+for root,_,names in os.walk("."):
+    for n in names:
+        p=os.path.join(root,n)
+        try: files.append((os.path.getsize(p),p))
+        except OSError: pass
+for size,p in sorted(files,reverse=True)[:20]:
+    print(f"{size/1048576:8.1f} MB  {p}")`
+ }},
+{id:"disk-findext", cat:"Disk & Files", title:"Find files by extension",
+ desc:"Recursively locate all files of a given type.",
+ code:{
+  ps:`Get-ChildItem -Path . -Recurse -Filter *.log -File |
+  Select-Object FullName, LastWriteTime, Length`,
+  cmd:`dir /s /b *.log`,
+  mac:`# -printf is GNU-only; use BSD stat for the mtime:
+find . -type f -name '*.log' -exec stat -f '%Sm  %N' {} +`,
+  linux:`find . -type f -name '*.log' -printf '%TY-%Tm-%Td  %p\\n'`,
+  py:`from pathlib import Path
+for p in Path(".").rglob("*.log"):
+    print(p)`
+ }},
+{id:"disk-hash", cat:"Disk & Files", title:"Hash a file (SHA-256)",
+ desc:"Verify integrity or match a known-good/known-bad hash.",
+ code:{
+  ps:`Get-FileHash -Path .\\file.bin -Algorithm SHA256 | Select-Object Hash, Path`,
+  cmd:`certutil -hashfile file.bin SHA256`,
+  mac:`shasum -a 256 file.bin`,
+  linux:`sha256sum file.bin`,
+  py:`import hashlib
+h=hashlib.sha256()
+with open("file.bin","rb") as f:
+    for chunk in iter(lambda: f.read(1<<20), b""):
+        h.update(chunk)
+print(h.hexdigest())`
+ }},
+
+/* ---------- PROCESSES & SERVICES ---------- */
+{id:"proc-top", cat:"Processes & Services", title:"Top processes by CPU / memory",
+ desc:"See what's actually eating the machine right now.",
+ code:{
+  ps:`Get-Process | Sort-Object CPU -Descending |
+  Select-Object -First 15 Name, Id,
+    @{n='CPU_s';e={[math]::Round($_.CPU,1)}},
+    @{n='RAM_MB';e={[math]::Round($_.WorkingSet64/1MB,1)}}`,
+  cmd:`tasklist /v /fo table | more`,
+  mac:`ps aux -r | head -16   # BSD ps: -r sorts by CPU`,
+  linux:`ps aux --sort=-%cpu | head -16`
+ }},
+{id:"proc-kill", cat:"Processes & Services", title:"Kill a process by name",
+ desc:"Force-stop a hung application.",
+ danger:"Force-terminates processes — unsaved data may be lost.",
+ code:{
+  ps:`Stop-Process -Name 'notepad' -Force`,
+  cmd:`taskkill /IM notepad.exe /F`,
+  mac:`pkill -f notepad`,
+  linux:`pkill -f notepad`
+ }},
+{id:"proc-services", cat:"Processes & Services", title:"Running services",
+ desc:"List services currently in the running state.",
+ code:{
+  ps:`Get-Service | Where-Object Status -eq 'Running' |
+  Select-Object Status, Name, DisplayName | Sort-Object DisplayName`,
+  cmd:`net start`,
+  mac:`launchctl list`,
+  linux:`systemctl list-units --type=service --state=running --no-pager`
+ }},
+{id:"proc-restart-svc", cat:"Processes & Services", title:"Restart a service",
+ desc:"Bounce a service (example: the print spooler).",
+ code:{
+  ps:`Restart-Service -Name 'Spooler' -Force
+Get-Service Spooler | Select-Object Status, Name`,
+  cmd:`net stop Spooler && net start Spooler`,
+  mac:`# bounce a launchd service (example: CUPS printing):
+sudo launchctl kickstart -k system/org.cups.cupsd`,
+  linux:`sudo systemctl restart cups
+systemctl is-active cups`
+ }},
+{id:"proc-startup", cat:"Processes & Services", title:"Startup / autorun items",
+ desc:"What launches at boot or logon — a common malware hiding spot.",
+ code:{
+  ps:`Get-CimInstance Win32_StartupCommand |
+  Select-Object Name, Command, Location, User`,
+  cmd:`wmic startup get caption,command,location`,
+  mac:`launchctl list
+echo "-- launch agents / daemons --"
+ls -1 ~/Library/LaunchAgents /Library/LaunchAgents /Library/LaunchDaemons 2>/dev/null`,
+  linux:`systemctl list-unit-files --state=enabled --no-pager
+ls -la ~/.config/autostart/ 2>/dev/null`
+ }},
+
+/* ---------- FORENSICS ---------- */
+{id:"for-recent", cat:"Forensics", title:"Recently modified files (last 24h)",
+ desc:"Surface files touched in the last day — activity triage.",
+ code:{
+  ps:`Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue |
+  Where-Object LastWriteTime -gt (Get-Date).AddDays(-1) |
+  Select-Object LastWriteTime, FullName | Sort-Object LastWriteTime -Descending`,
+  mac:`find . -type f -mtime -1 -exec stat -f '%Sm  %N' {} + 2>/dev/null | sort`,
+  linux:`find . -type f -mtime -1 -printf '%TY-%Tm-%Td %TH:%TM  %p\\n' 2>/dev/null | sort`,
+  py:`import os, time
+cut=time.time()-86400
+for root,_,names in os.walk("."):
+    for n in names:
+        p=os.path.join(root,n)
+        try:
+            m=os.path.getmtime(p)
+            if m>cut: print(time.strftime('%Y-%m-%d %H:%M',time.localtime(m)),p)
+        except OSError: pass`
+ }},
+{id:"for-logons", cat:"Forensics", title:"Recent successful logons (Event 4624)",
+ desc:"Pull the last logon events from the Security log.",
+ danger:"Requires administrator / SeSecurityPrivilege.",
+ code:{
+  ps:`Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} -MaxEvents 25 |
+  Select-Object TimeCreated,
+    @{n='User';e={$_.Properties[5].Value}},
+    @{n='LogonType';e={$_.Properties[8].Value}},
+    @{n='Source';e={$_.Properties[18].Value}}`,
+  cmd:`wevtutil qe Security /q:"*[System[(EventID=4624)]]" /c:25 /rd:true /f:text`
+ }},
+{id:"for-usb", cat:"Forensics", title:"USB storage device history (Windows)",
+ desc:"Devices that have been connected, from the registry.",
+ code:{
+  ps:`Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR' |
+  ForEach-Object { $_.PSChildName }`,
+  cmd:`reg query HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR`
+ }},
+{id:"for-prefetch", cat:"Forensics", title:"Prefetch listing (execution evidence)",
+ desc:"List .pf files with timestamps — evidence of program execution.",
+ code:{
+  ps:`Get-ChildItem 'C:\\Windows\\Prefetch\\*.pf' -ErrorAction SilentlyContinue |
+  Select-Object Name, LastWriteTime, Length | Sort-Object LastWriteTime -Descending`,
+  cmd:`dir /o-d C:\\Windows\\Prefetch\\*.pf`
+ }},
+{id:"for-hashdir", cat:"Forensics", title:"Hash every file in a folder → CSV",
+ desc:"Build an integrity manifest for a directory of evidence.",
+ code:{
+  ps:`Get-ChildItem -Path . -Recurse -File |
+  Get-FileHash -Algorithm SHA256 |
+  Select-Object Hash, Path |
+  Export-Csv -Path .\\hashes.csv -NoTypeInformation
+"Wrote hashes.csv"`,
+  mac:`find . -type f -exec shasum -a 256 {} + > hashes.txt
+echo "Wrote hashes.txt (\$(wc -l < hashes.txt | tr -d ' ') files)"`,
+  linux:`find . -type f -exec sha256sum {} \\; > hashes.txt
+echo "Wrote hashes.txt (\$(wc -l < hashes.txt) files)"`,
+  py:`import hashlib, csv, os
+with open("hashes.csv","w",newline="") as out:
+    w=csv.writer(out); w.writerow(["sha256","path"])
+    for root,_,names in os.walk("."):
+        for n in names:
+            p=os.path.join(root,n)
+            h=hashlib.sha256()
+            try:
+                with open(p,"rb") as f:
+                    for c in iter(lambda: f.read(1<<20), b""): h.update(c)
+                w.writerow([h.hexdigest(),p])
+            except OSError: pass
+print("Wrote hashes.csv")`
+ }},
+{id:"for-installed", cat:"Forensics", title:"Installed programs list",
+ desc:"Enumerate installed software from the uninstall registry keys.",
+ code:{
+  ps:`$paths='HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+        'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
+Get-ItemProperty $paths -ErrorAction SilentlyContinue |
+  Where-Object DisplayName |
+  Select-Object DisplayName, DisplayVersion, Publisher, InstallDate |
+  Sort-Object DisplayName`,
+  cmd:`reg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall /s /f DisplayName`
+ }},
+
+/* ---------- SECURITY ---------- */
+{id:"sec-firewall", cat:"Security", title:"Firewall status",
+ desc:"Are the firewall profiles on, and what's the default action.",
+ code:{
+  ps:`Get-NetFirewallProfile |
+  Select-Object Name, Enabled, DefaultInboundAction, DefaultOutboundAction`,
+  cmd:`netsh advfirewall show allprofiles state`,
+  mac:`# application firewall + packet filter:
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate
+sudo pfctl -s info 2>/dev/null`,
+  linux:`sudo ufw status verbose 2>/dev/null || sudo iptables -L -n -v`
+ }},
+{id:"sec-defender", cat:"Security", title:"Windows Defender status",
+ desc:"Real-time protection, signature age, and last scan.",
+ code:{
+  ps:`Get-MpComputerStatus |
+  Select-Object AMRunningMode, RealTimeProtectionEnabled,
+    AntivirusSignatureLastUpdated, QuickScanEndTime, AntispywareEnabled`
+ }},
+{id:"sec-hotfix", cat:"Security", title:"Installed updates / hotfixes",
+ desc:"Patch level and most recent updates applied.",
+ code:{
+  ps:`Get-HotFix | Sort-Object InstalledOn -Descending |
+  Select-Object -First 20 HotFixID, Description, InstalledOn`,
+  cmd:`wmic qfe list brief /format:table`,
+  mac:`# OS update history (falls back to full install history):
+softwareupdate --history 2>/dev/null || system_profiler SPInstallHistoryDataType`,
+  linux:`# Debian/Ubuntu recent package changes:
+grep " install \\| upgrade " /var/log/dpkg.log 2>/dev/null | tail -20`
+ }},
+
+/* ---------- MAINTENANCE ---------- */
+{id:"mnt-temp", cat:"Maintenance", title:"Clear temp files",
+ desc:"Wipe the current user's temp folder to reclaim space.",
+ danger:"Deletes files — closes nothing gracefully. Skips locked files.",
+ code:{
+  ps:`Remove-Item "$env:TEMP\\*" -Recurse -Force -ErrorAction SilentlyContinue
+"Cleared $env:TEMP"`,
+  cmd:`del /q /f /s "%TEMP%\\*" >nul 2>&1
+echo Cleared %TEMP%`,
+  mac:`rm -rf "\${TMPDIR:-/tmp}"/* 2>/dev/null; echo "Cleared \${TMPDIR:-/tmp}"`,
+  linux:`rm -rf "\${TMPDIR:-/tmp}"/* 2>/dev/null; echo "Cleared \${TMPDIR:-/tmp}"`
+ }},
+{id:"mnt-flushdns", cat:"Maintenance", title:"Flush DNS cache",
+ desc:"Clear the resolver cache after a DNS change.",
+ code:{
+  ps:`Clear-DnsClientCache; "DNS cache flushed"`,
+  cmd:`ipconfig /flushdns`,
+  mac:`sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder; echo "DNS cache flushed"`,
+  linux:`sudo resolvectl flush-caches 2>/dev/null || sudo systemd-resolve --flush-caches`
+ }},
+{id:"mnt-sfc", cat:"Maintenance", title:"Repair system files (SFC + DISM)",
+ desc:"Standard Windows corruption repair sequence.",
+ danger:"Long-running; run in an elevated prompt.",
+ code:{
+  cmd:`DISM /Online /Cleanup-Image /RestoreHealth
+sfc /scannow`,
+  ps:`Repair-WindowsImage -Online -RestoreHealth
+sfc /scannow`
+ }},
+{id:"mnt-recycle", cat:"Maintenance", title:"Empty the Recycle Bin",
+ desc:"Clear the recycle bin across all drives.",
+ danger:"Permanently deletes recycled files.",
+ code:{
+  ps:`Clear-RecycleBin -Force -ErrorAction SilentlyContinue; "Recycle Bin emptied"`,
+  cmd:`rd /s /q C:\\$Recycle.Bin 2>nul & echo Done`
+ }},
+
+/* ==================================================================
+   ADDED — common tasks for network / account / security admins,
+   repair techs, and everyday users.
+   ================================================================== */
+
+/* ---------- SYSTEM INFO (added) ---------- */
+{id:"sys-env", cat:"System Info", title:"Environment variables / PATH",
+ desc:"Dump environment variables and expand PATH one entry per line.",
+ code:{
+  ps:`Get-ChildItem Env: | Sort-Object Name
+"-- PATH --"; $env:Path -split ';'`,
+  cmd:`set
+echo.& echo -- PATH --
+echo %PATH%`,
+  mac:`printenv | sort
+echo "-- PATH --"; echo "$PATH" | tr ':' '\\n'`,
+  linux:`printenv | sort
+echo "-- PATH --"; echo "$PATH" | tr ':' '\\n'`,
+  py:`import os
+for k in sorted(os.environ): print(f"{k}={os.environ[k]}")
+print("-- PATH --")
+print(*os.environ.get("PATH","").split(os.pathsep), sep="\\n")`
+ }},
+{id:"sys-memory", cat:"System Info", title:"Memory usage (used / free)",
+ desc:"Physical RAM total, used, and available right now.",
+ code:{
+  ps:`$os=Get-CimInstance Win32_OperatingSystem
+[pscustomobject]@{
+  Total_GB=[math]::Round($os.TotalVisibleMemorySize/1MB,1)
+  Free_GB =[math]::Round($os.FreePhysicalMemory/1MB,1)
+  Used_GB =[math]::Round(($os.TotalVisibleMemorySize-$os.FreePhysicalMemory)/1MB,1)
+}`,
+  cmd:`systeminfo | findstr /C:"Total Physical Memory" /C:"Available Physical Memory"`,
+  mac:`top -l 1 | grep -E "PhysMem"
+vm_stat`,
+  linux:`free -h`
+ }},
+{id:"sys-battery", cat:"System Info", title:"Battery status & health",
+ desc:"Charge level and, where available, battery health/condition.",
+ code:{
+  ps:`Get-CimInstance Win32_Battery | Select-Object EstimatedChargeRemaining, BatteryStatus
+# full HTML health report:
+powercfg /batteryreport /output "$env:USERPROFILE\\battery-report.html"`,
+  cmd:`powercfg /batteryreport /output "%USERPROFILE%\\battery-report.html"`,
+  mac:`pmset -g batt
+system_profiler SPPowerDataType | grep -iE -A2 "condition|cycle count|maximum capacity"`,
+  linux:`# sysfs, no deps:
+cat /sys/class/power_supply/BAT*/capacity /sys/class/power_supply/BAT*/status 2>/dev/null
+# richer detail if installed: upower -i $(upower -e | grep BAT)`
+ }},
+{id:"sys-time", cat:"System Info", title:"Date, time & clock sync",
+ desc:"Current time, timezone, and whether the clock is syncing to NTP.",
+ code:{
+  ps:`Get-Date
+Get-TimeZone | Select-Object Id, DisplayName
+w32tm /query /status`,
+  cmd:`echo %DATE% %TIME%
+w32tm /query /status`,
+  mac:`date "+%Y-%m-%d %H:%M:%S %Z"
+sudo systemsetup -getnetworktimeserver 2>/dev/null
+sudo systemsetup -getusingnetworktime 2>/dev/null`,
+  linux:`timedatectl`
+ }},
+{id:"sys-drivers", cat:"System Info", title:"Drivers & hardware devices",
+ desc:"Enumerate device drivers / kernel modules and attached hardware.",
+ code:{
+  ps:`Get-CimInstance Win32_PnPSignedDriver |
+  Select-Object DeviceName, DriverVersion, Manufacturer, DriverDate |
+  Sort-Object DeviceName`,
+  cmd:`driverquery /v /fo table`,
+  mac:`system_profiler SPPCIDataType SPUSBDataType
+# third-party kernel extensions:
+kextstat 2>/dev/null | grep -v com.apple`,
+  linux:`# needs pciutils / usbutils for lspci / lsusb:
+lspci -k 2>/dev/null; echo "-- usb --"; lsusb 2>/dev/null
+echo "-- loaded modules --"; lsmod`
+ }},
+{id:"sys-display", cat:"System Info", title:"GPU & display info",
+ desc:"Graphics adapter, driver, and connected monitors / resolution.",
+ code:{
+  ps:`Get-CimInstance Win32_VideoController |
+  Select-Object Name, DriverVersion,
+    CurrentHorizontalResolution, CurrentVerticalResolution, CurrentRefreshRate`,
+  cmd:`wmic path win32_VideoController get name,driverversion,videomodedescription
+:: wmic is deprecated; prefer PowerShell Get-CimInstance Win32_VideoController`,
+  mac:`system_profiler SPDisplaysDataType`,
+  linux:`lspci 2>/dev/null | grep -Ei 'vga|3d|display'
+xrandr --query 2>/dev/null | grep ' connected'`
+ }},
+
+/* ---------- NETWORK (added) ---------- */
+{id:"net-traceroute", cat:"Network", title:"Trace route to a host",
+ desc:"Show the L3 hops between you and a destination.",
+ code:{
+  ps:`Test-NetConnection example.com -TraceRoute |
+  Select-Object -ExpandProperty TraceRoute`,
+  cmd:`tracert example.com`,
+  mac:`traceroute example.com`,
+  linux:`traceroute example.com || tracepath example.com   # traceroute may need install`
+ }},
+{id:"net-dhcp-renew", cat:"Network", title:"Release & renew DHCP lease",
+ desc:"Force a new DHCP address — first step after IP/gateway trouble.",
+ danger:"Drops connectivity for a moment; over SSH/RDP you may lose the session.",
+ code:{
+  ps:`ipconfig /release
+ipconfig /renew`,
+  cmd:`ipconfig /release
+ipconfig /renew`,
+  mac:`# set your interface (en0 Wi-Fi, en0/en1 Ethernet):
+sudo ipconfig set en0 DHCP`,
+  linux:`sudo dhclient -r && sudo dhclient        # or: sudo networkctl renew eth0`
+ }},
+{id:"net-routes", cat:"Network", title:"Routing table",
+ desc:"Active routes and the default gateway per interface.",
+ code:{
+  ps:`Get-NetRoute -AddressFamily IPv4 |
+  Sort-Object RouteMetric |
+  Select-Object DestinationPrefix, NextHop, RouteMetric, ifIndex`,
+  cmd:`route print -4`,
+  mac:`netstat -rn -f inet`,
+  linux:`ip route`
+ }},
+{id:"net-connections", cat:"Network", title:"Active TCP connections + process",
+ desc:"Established sessions and which process owns each.",
+ code:{
+  ps:`Get-NetTCPConnection -State Established |
+  Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort,
+    @{n='Process';e={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}}`,
+  cmd:`netstat -ano | findstr ESTABLISHED`,
+  mac:`sudo lsof -nP -iTCP -sTCP:ESTABLISHED`,
+  linux:`ss -tnp state established`
+ }},
+{id:"net-dns-records", cat:"Network", title:"Query DNS record types (MX/TXT/…)",
+ desc:"Look up mail, text, and alias records — mail/SPF/DKIM troubleshooting.",
+ code:{
+  ps:`foreach ($t in 'MX','TXT','NS','CNAME') {
+  "== $t =="; Resolve-DnsName -Type $t example.com -ErrorAction SilentlyContinue
+}`,
+  cmd:`nslookup -type=MX example.com
+nslookup -type=TXT example.com`,
+  mac:`for t in MX TXT NS CNAME; do echo "== $t =="; dig +short example.com $t; done`,
+  linux:`for t in MX TXT NS CNAME; do echo "== $t =="; dig +short example.com $t; done   # dig: dnsutils/bind-utils`
+ }},
+{id:"net-http-head", cat:"Network", title:"HTTP status & response headers",
+ desc:"Check a URL's status code, redirects, and server headers.",
+ code:{
+  ps:`$r = Invoke-WebRequest -Uri 'https://example.com' -Method Head
+"Status: $([int]$r.StatusCode) $($r.StatusDescription)"
+$r.Headers`,
+  cmd:`curl -sI https://example.com`,
+  mac:`curl -sI https://example.com`,
+  linux:`curl -sI https://example.com`
+ }},
+{id:"net-tls-cert", cat:"Network", title:"Inspect a server's TLS certificate",
+ desc:"Subject, issuer, and validity dates for a host's cert. cmd/mac/linux use openssl.",
+ code:{
+  ps:`$h='example.com'; $p=443
+$c=[System.Net.Sockets.TcpClient]::new($h,$p)
+$s=[System.Net.Security.SslStream]::new($c.GetStream())
+$s.AuthenticateAsClient($h)
+[System.Security.Cryptography.X509Certificates.X509Certificate2]$s.RemoteCertificate |
+  Select-Object Subject, Issuer, NotBefore, NotAfter, Thumbprint
+$s.Dispose(); $c.Dispose()`,
+  cmd:`openssl s_client -connect example.com:443 -servername example.com < NUL | openssl x509 -noout -subject -issuer -dates`,
+  mac:`echo | openssl s_client -connect example.com:443 -servername example.com 2>/dev/null | openssl x509 -noout -subject -issuer -dates`,
+  linux:`echo | openssl s_client -connect example.com:443 -servername example.com 2>/dev/null | openssl x509 -noout -subject -issuer -dates`
+ }},
+{id:"net-shares", cat:"Network", title:"Network shares & sessions",
+ desc:"Local file shares being served and what's connected / mounted.",
+ code:{
+  ps:`Get-SmbShare | Select-Object Name, Path, Description
+"-- sessions --"; Get-SmbSession | Select-Object ClientComputerName, ClientUserName, NumOpens`,
+  cmd:`net share
+echo -- sessions --
+net session`,
+  mac:`sharing -l 2>/dev/null
+echo "-- mounted --"; mount | grep -i smbfs`,
+  linux:`sudo smbstatus 2>/dev/null       # Samba server
+sudo exportfs -v 2>/dev/null      # NFS exports
+echo "-- mounted --"; mount | grep -E 'cifs|nfs'`
+ }},
+{id:"net-mapdrive", cat:"Network", title:"Map / mount a network share",
+ desc:"Attach an SMB/CIFS share as a drive or mount point. Edit server/share/creds.",
+ code:{
+  ps:`New-SmbMapping -LocalPath 'Z:' -RemotePath '\\\\server\\share' -Persistent $true
+# with creds: -UserName 'DOMAIN\\user' -Password 'pass'`,
+  cmd:`net use Z: \\\\server\\share /persistent:yes
+:: with creds: net use Z: \\\\server\\share password /user:DOMAIN\\user`,
+  mac:`mkdir -p ~/mnt/share
+mount_smbfs //user@server/share ~/mnt/share    # or: open smb://server/share`,
+  linux:`sudo mkdir -p /mnt/share
+sudo mount -t cifs //server/share /mnt/share -o username=USER   # needs cifs-utils`
+ }},
+{id:"net-proxy", cat:"Network", title:"Show proxy configuration",
+ desc:"Current system/user HTTP(S) proxy settings.",
+ code:{
+  ps:`Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings' |
+  Select-Object ProxyEnable, ProxyServer, AutoConfigURL
+netsh winhttp show proxy`,
+  cmd:`netsh winhttp show proxy
+reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyServer`,
+  mac:`scutil --proxy`,
+  linux:`env | grep -i _proxy
+gsettings get org.gnome.system.proxy mode 2>/dev/null`
+ }},
+{id:"net-adapter-toggle", cat:"Network", title:"Disable / re-enable a network adapter",
+ desc:"Bounce a NIC to clear a stuck link. Edit the interface name.",
+ danger:"Takes the interface down — you'll lose any remote session on it. Needs admin/root.",
+ code:{
+  ps:`Disable-NetAdapter -Name 'Ethernet' -Confirm:$false
+Enable-NetAdapter  -Name 'Ethernet' -Confirm:$false`,
+  cmd:`netsh interface set interface "Ethernet" admin=disable
+netsh interface set interface "Ethernet" admin=enable`,
+  mac:`sudo ifconfig en0 down && sudo ifconfig en0 up`,
+  linux:`sudo ip link set eth0 down && sudo ip link set eth0 up`
+ }},
+{id:"net-stack-reset", cat:"Network", title:"Reset / restart the network stack",
+ desc:"Last-resort fix for corrupted networking. Windows resets Winsock + TCP/IP.",
+ danger:"Windows needs a reboot to finish. All: drops connectivity; needs admin/root.",
+ code:{
+  ps:`netsh winsock reset
+netsh int ip reset
+Clear-DnsClientCache
+Write-Host "Reboot to complete."`,
+  cmd:`netsh winsock reset
+netsh int ip reset
+ipconfig /flushdns
+echo Reboot to complete.`,
+  mac:`sudo dscacheutil -flushcache
+sudo killall -HUP mDNSResponder
+sudo ifconfig en0 down && sudo ifconfig en0 up`,
+  linux:`sudo systemctl restart NetworkManager 2>/dev/null || sudo systemctl restart systemd-networkd`
+ }},
+{id:"net-wifi-scan", cat:"Network", title:"Scan nearby Wi-Fi networks",
+ desc:"List visible SSIDs, signal, and channel.",
+ code:{
+  ps:`netsh wlan show networks mode=bssid`,
+  cmd:`netsh wlan show networks mode=bssid`,
+  mac:`# airport was removed in macOS 14.4+; on older builds:
+/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -s 2>/dev/null ||
+  system_profiler SPAirPortDataType`,
+  linux:`nmcli dev wifi list 2>/dev/null || sudo iw dev wlan0 scan | grep -E 'SSID|signal'`
+ }},
+
+/* ---------- USERS & ACCESS (added) ---------- */
+{id:"usr-whoami", cat:"Users & Access", title:"Current user, groups & privileges",
+ desc:"Who am I, my group memberships, and (Windows) my privileges.",
+ code:{
+  ps:`whoami /all`,
+  cmd:`whoami /all`,
+  mac:`id
+echo "groups: $(groups)"`,
+  linux:`id
+echo "groups: $(groups)"`
+ }},
+{id:"usr-passwd-reset", cat:"Users & Access", title:"Reset a user's password",
+ desc:"Set a new password for an account. Edit the username.",
+ danger:"Changes another user's credentials — authorized admin recovery only.",
+ code:{
+  ps:`$pw = Read-Host 'New password' -AsSecureString
+Set-LocalUser -Name 'techuser' -Password $pw`,
+  cmd:`net user techuser *`,
+  mac:`sudo dscl . -passwd /Users/techuser`,
+  linux:`sudo passwd techuser`
+ }},
+{id:"usr-disable", cat:"Users & Access", title:"Disable / enable an account",
+ desc:"Lock an account out without deleting it (swap the verb to re-enable).",
+ danger:"Blocks the user from logging in. Needs admin/root.",
+ code:{
+  ps:`Disable-LocalUser -Name 'techuser'
+# re-enable: Enable-LocalUser -Name 'techuser'`,
+  cmd:`net user techuser /active:no
+:: re-enable: net user techuser /active:yes`,
+  mac:`sudo pwpolicy -u techuser disableuser
+# re-enable: sudo pwpolicy -u techuser enableuser`,
+  linux:`sudo usermod -L techuser
+# re-enable: sudo usermod -U techuser`
+ }},
+{id:"usr-unlock", cat:"Users & Access", title:"Unlock a locked-out account",
+ desc:"Clear a lockout from too many failed logons.",
+ danger:"Authorized admin recovery only. Needs admin/root.",
+ code:{
+  ps:`# Windows has no local 'unlock' cmdlet; a lockout clears after the lockout
+# window, or immediately when you reset the password:
+Set-LocalUser -Name 'techuser' -Password (Read-Host 'New password' -AsSecureString)`,
+  cmd:`:: no native local unlock; reset the password to clear the lockout:
+net user techuser *`,
+  mac:`# force-clear by resetting the password:
+sudo dscl . -passwd /Users/techuser`,
+  linux:`sudo faillock --user techuser --reset   # pam_faillock
+sudo usermod -U techuser                # also clears a password lock`
+ }},
+{id:"usr-delete", cat:"Users & Access", title:"Delete a local account",
+ desc:"Remove a user. mac/linux options also delete the home directory.",
+ danger:"Irreversible account (and home-folder) deletion. Needs admin/root.",
+ code:{
+  ps:`Remove-LocalUser -Name 'techuser'`,
+  cmd:`net user techuser /delete`,
+  mac:`sudo sysadminctl -deleteUser techuser`,
+  linux:`sudo userdel -r techuser   # -r also removes the home directory`
+ }},
+{id:"usr-groups-of", cat:"Users & Access", title:"Groups a user belongs to",
+ desc:"Enumerate the group memberships of a specific account. Edit the username.",
+ code:{
+  ps:`Get-LocalGroup | Where-Object {
+  Get-LocalGroupMember $_.Name -Member 'techuser' -ErrorAction SilentlyContinue
+} | Select-Object -ExpandProperty Name`,
+  cmd:`net user techuser | findstr /C:"Local Group Memberships" /C:"Global Group"`,
+  mac:`id techuser
+groups techuser`,
+  linux:`id techuser
+groups techuser`
+ }},
+{id:"usr-lastlogon", cat:"Users & Access", title:"Last logon & password age",
+ desc:"When accounts last signed in and when passwords were last changed.",
+ code:{
+  ps:`Get-LocalUser |
+  Select-Object Name, Enabled, LastLogon, PasswordLastSet, PasswordExpires`,
+  cmd:`net user techuser | findstr /C:"Last logon" /C:"Password last set" /C:"Password expires"`,
+  mac:`last | head -20
+# password last set:
+sudo dscl . -read /Users/techuser accountPolicyData 2>/dev/null`,
+  linux:`lastlog
+echo "-- password aging --"; sudo chage -l techuser`
+ }},
+{id:"usr-policy", cat:"Users & Access", title:"Password & lockout policy",
+ desc:"Minimum length, expiry, and lockout thresholds in effect.",
+ code:{
+  ps:`net accounts`,
+  cmd:`net accounts`,
+  mac:`sudo pwpolicy getaccountpolicies 2>/dev/null | tail -n +2`,
+  linux:`grep -E '^PASS_(MAX|MIN|WARN)' /etc/login.defs
+echo "-- lockout (pam_faillock) --"; grep -h faillock /etc/pam.d/* 2>/dev/null | sort -u`
+ }},
+{id:"usr-logoff", cat:"Users & Access", title:"Force-logoff a session",
+ desc:"Disconnect / sign out another user's session. Get the session id first.",
+ danger:"Ends the session immediately — unsaved work is lost. Needs admin/root.",
+ code:{
+  ps:`query user
+# then log off by ID:
+logoff 2`,
+  cmd:`query user
+logoff 2`,
+  mac:`# terminate a user's GUI + processes:
+sudo launchctl bootout user/$(id -u techuser) 2>/dev/null || sudo pkill -KILL -u techuser`,
+  linux:`loginctl terminate-user techuser   # or: sudo pkill -KILL -u techuser`
+ }},
+{id:"usr-lock", cat:"Users & Access", title:"Lock the screen now",
+ desc:"Immediately lock the current session.",
+ code:{
+  ps:`rundll32.exe user32.dll,LockWorkStation`,
+  cmd:`rundll32.exe user32.dll,LockWorkStation`,
+  mac:`/System/Library/CoreServices/"Menu Extras"/User.menu/Contents/Resources/CGSession -suspend`,
+  linux:`loginctl lock-session 2>/dev/null || xdg-screensaver lock`
+ }},
+
+/* ---------- DISK & FILES (added) ---------- */
+{id:"disk-tree", cat:"Disk & Files", title:"Folder size breakdown",
+ desc:"Total size of each immediate subfolder — find what's eating a directory.",
+ code:{
+  ps:`Get-ChildItem -Directory | ForEach-Object {
+  $mb=[math]::Round(((Get-ChildItem $_.FullName -Recurse -File -ErrorAction SilentlyContinue |
+    Measure-Object Length -Sum).Sum)/1MB,1)
+  [pscustomobject]@{Folder=$_.Name; MB=$mb}
+} | Sort-Object MB -Descending`,
+  mac:`du -h -d1 . | sort -h`,
+  linux:`du -h --max-depth=1 . | sort -h`,
+  py:`import os
+for d in sorted(os.scandir("."), key=lambda e: e.name):
+    if d.is_dir():
+        tot=sum(os.path.getsize(os.path.join(r,f))
+                for r,_,fs in os.walk(d.path) for f in fs
+                if os.path.exists(os.path.join(r,f)))
+        print(f"{tot/1048576:10.1f} MB  {d.name}")`
+ }},
+{id:"disk-smart", cat:"Disk & Files", title:"Drive SMART / health status",
+ desc:"Physical disk health — early warning of a failing drive.",
+ code:{
+  ps:`Get-PhysicalDisk |
+  Select-Object FriendlyName, MediaType, HealthStatus, OperationalStatus,
+    @{n='Size_GB';e={[math]::Round($_.Size/1GB)}}`,
+  cmd:`wmic diskdrive get model,status
+:: wmic is deprecated; PowerShell Get-PhysicalDisk is preferred`,
+  mac:`diskutil info disk0 | grep -i "SMART"`,
+  linux:`sudo smartctl -H /dev/sda   # needs smartmontools`
+ }},
+{id:"file-search-text", cat:"Disk & Files", title:"Search text inside files",
+ desc:"Recursively find files containing a string, with line numbers.",
+ code:{
+  ps:`Get-ChildItem -Recurse -File -ErrorAction SilentlyContinue |
+  Select-String -Pattern 'searchterm' |
+  Select-Object Path, LineNumber, Line`,
+  cmd:`findstr /s /i /n "searchterm" *.*`,
+  mac:`grep -rniI "searchterm" .`,
+  linux:`grep -rniI "searchterm" .`,
+  py:`import pathlib
+term="searchterm"
+for p in pathlib.Path(".").rglob("*"):
+    if p.is_file():
+        try:
+            for i,line in enumerate(p.open('r',errors='ignore'),1):
+                if term in line: print(f"{p}:{i}: {line.rstrip()}")
+        except OSError: pass`
+ }},
+{id:"file-zip", cat:"Disk & Files", title:"Create / extract a zip archive",
+ desc:"Zip a folder and unzip an archive. Edit the paths.",
+ code:{
+  ps:`Compress-Archive -Path .\\folder\\* -DestinationPath out.zip -Force
+# extract:
+Expand-Archive -Path out.zip -DestinationPath .\\dest -Force`,
+  cmd:`tar -a -c -f out.zip folder
+:: extract:
+tar -x -f out.zip`,
+  mac:`zip -r out.zip folder
+unzip out.zip -d dest`,
+  linux:`zip -r out.zip folder      # or: tar -czf out.tar.gz folder
+unzip out.zip -d dest       # or: tar -xzf out.tar.gz`,
+  py:`import shutil
+shutil.make_archive("out","zip","folder")   # -> out.zip
+shutil.unpack_archive("out.zip","dest")`
+ }},
+{id:"file-copy", cat:"Disk & Files", title:"Mirror / sync a folder",
+ desc:"Efficiently copy a tree, only changed files. Edit src/dst.",
+ danger:"/MIR and --delete make the destination match the source — extra files there are DELETED.",
+ code:{
+  ps:`robocopy .\\src .\\dst /MIR /R:1 /W:1
+# drop /MIR for an additive copy (no deletes)`,
+  cmd:`robocopy src dst /MIR /R:1 /W:1`,
+  mac:`rsync -a --delete src/ dst/     # trailing slash on src matters`,
+  linux:`rsync -a --delete src/ dst/     # drop --delete for an additive copy`
+ }},
+{id:"file-perms", cat:"Disk & Files", title:"View / change file permissions",
+ desc:"Inspect ACLs/mode and grant access. Edit the target and principal.",
+ danger:"Changing ownership or ACLs can lock users out of files. Others' files need elevation.",
+ code:{
+  ps:`Get-Acl .\\file | Format-List
+# grant a user full control:
+icacls .\\file /grant 'DOMAIN\\user:(F)'`,
+  cmd:`icacls file
+:: grant modify:
+icacls file /grant user:(M)`,
+  mac:`ls -le file
+chmod 640 file
+sudo chown user:staff file`,
+  linux:`stat -c '%A %U:%G' file
+chmod 640 file
+sudo chown user:group file`
+ }},
+
+/* ---------- PROCESSES & SERVICES (added) ---------- */
+{id:"proc-tree", cat:"Processes & Services", title:"Process tree (parent → child)",
+ desc:"See process parentage — spot what spawned a suspicious child.",
+ code:{
+  ps:`Get-CimInstance Win32_Process |
+  Select-Object ProcessId, ParentProcessId, Name |
+  Sort-Object ParentProcessId, ProcessId`,
+  cmd:`wmic process get Name,ProcessId,ParentProcessId
+:: wmic deprecated; PowerShell Get-CimInstance Win32_Process is preferred`,
+  mac:`ps -axo pid,ppid,user,command`,
+  linux:`ps -e --forest -o pid,ppid,user,cmd    # or: pstree -p`
+ }},
+{id:"proc-find-port", cat:"Processes & Services", title:"Find the process using a port",
+ desc:"Identify what's bound to a port — resolve 'address already in use'. Edit the port.",
+ code:{
+  ps:`Get-NetTCPConnection -LocalPort 443 |
+  Select-Object LocalPort, State, OwningProcess,
+    @{n='Process';e={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}}`,
+  cmd:`netstat -ano | findstr :443
+:: map the PID from the last column:
+tasklist /fi "PID eq 1234"`,
+  mac:`sudo lsof -nP -iTCP:443`,
+  linux:`sudo ss -tulpnH "sport = :443" || sudo lsof -nP -i:443`
+ }},
+{id:"svc-config", cat:"Processes & Services", title:"Set a service's start type",
+ desc:"Enable, disable, or set a service to manual start. Edit the service name.",
+ danger:"Disabling the wrong service can break the system. Needs admin/root.",
+ code:{
+  ps:`Set-Service -Name 'Spooler' -StartupType Automatic
+# options: Automatic | Manual | Disabled`,
+  cmd:`sc config Spooler start= auto
+:: note the space after '=' ; options: auto | demand | disabled`,
+  mac:`sudo launchctl enable system/org.cups.cupsd
+# disable: sudo launchctl disable system/org.cups.cupsd`,
+  linux:`sudo systemctl enable --now cups
+# disable: sudo systemctl disable --now cups`
+ }},
+{id:"svc-failed", cat:"Processes & Services", title:"Failed / not-running auto services",
+ desc:"Services set to auto-start that aren't running — post-boot triage.",
+ code:{
+  ps:`Get-Service | Where-Object { $_.StartType -eq 'Automatic' -and $_.Status -ne 'Running' } |
+  Select-Object Name, DisplayName, Status`,
+  mac:`# nonzero last-exit-status = a job that failed:
+launchctl list | awk 'NR==1 || ($1!="-" && $2+0!=0)'`,
+  linux:`systemctl --failed --no-pager`
+ }},
+{id:"sched-tasks", cat:"Processes & Services", title:"Scheduled tasks / cron jobs",
+ desc:"Enumerate scheduled automation — a common persistence spot.",
+ code:{
+  ps:`Get-ScheduledTask | Where-Object State -ne 'Disabled' |
+  Select-Object TaskPath, TaskName, State`,
+  cmd:`schtasks /query /fo table /v`,
+  mac:`crontab -l 2>/dev/null
+launchctl list
+ls ~/Library/LaunchAgents /Library/LaunchAgents /Library/LaunchDaemons 2>/dev/null`,
+  linux:`crontab -l 2>/dev/null
+ls -la /etc/cron.d /etc/cron.daily 2>/dev/null
+systemctl list-timers --all --no-pager`
+ }},
+
+/* ---------- FORENSICS (added) ---------- */
+{id:"for-failed-logons", cat:"Forensics", title:"Failed logon attempts (Event 4625)",
+ desc:"Recent failed sign-ins — brute-force / lockout investigation.",
+ danger:"Requires administrator / root to read the security/auth logs.",
+ code:{
+  ps:`Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625} -MaxEvents 25 |
+  Select-Object TimeCreated,
+    @{n='User';e={$_.Properties[5].Value}},
+    @{n='Source';e={$_.Properties[19].Value}}`,
+  cmd:`wevtutil qe Security /q:"*[System[(EventID=4625)]]" /c:25 /rd:true /f:text`,
+  mac:`log show --style syslog --last 1d --predicate 'eventMessage CONTAINS[c] "authentication failed"' 2>/dev/null | tail -20`,
+  linux:`sudo lastb 2>/dev/null | head -20
+sudo grep -Ei 'failed password|authentication failure' /var/log/auth.log /var/log/secure 2>/dev/null | tail -20`
+ }},
+{id:"for-dns-cache", cat:"Forensics", title:"Cached DNS resolver entries",
+ desc:"Names the host resolved recently. Fully exposed only on Windows.",
+ code:{
+  ps:`Get-DnsClientCache | Select-Object Entry, Type, Data, TimeToLive`,
+  cmd:`ipconfig /displaydns`,
+  mac:`# not directly listable; dump mDNSResponder state to the unified log:
+sudo killall -INFO mDNSResponder
+log show --last 2m --predicate 'process == "mDNSResponder"' 2>/dev/null | grep -i cache | tail`,
+  linux:`# systemd-resolved keeps no dumpable list; show stats:
+resolvectl statistics 2>/dev/null || echo "no dumpable cache"`
+ }},
+{id:"for-history", cat:"Forensics", title:"Shell command history",
+ desc:"Recent commands run in the shell — user-activity triage.",
+ code:{
+  ps:`Get-Content (Get-PSReadLineOption).HistorySavePath -Tail 50`,
+  cmd:`doskey /history`,
+  mac:`tail -50 ~/.zsh_history 2>/dev/null; tail -50 ~/.bash_history 2>/dev/null`,
+  linux:`tail -50 ~/.bash_history 2>/dev/null; tail -50 ~/.zsh_history 2>/dev/null`
+ }},
+{id:"for-evtx-export", cat:"Forensics", title:"Export a log for offline analysis",
+ desc:"Save a copy of a system log to a file. Edit output paths.",
+ danger:"Reading full logs needs admin/root; writes a (potentially large) export file.",
+ code:{
+  ps:`wevtutil epl System "$env:USERPROFILE\\Desktop\\System.evtx"
+# or CSV: Get-WinEvent -LogName System -MaxEvents 500 | Export-Csv System.csv -NoTypeInformation`,
+  cmd:`wevtutil epl System "%USERPROFILE%\\Desktop\\System.evtx"`,
+  mac:`log collect --last 1d --output ~/Desktop/system.logarchive`,
+  linux:`sudo journalctl --since "1 day ago" > ~/journal-$(date +%F).txt`
+ }},
+
+/* ---------- SECURITY (added) ---------- */
+{id:"sec-defender-scan", cat:"Security", title:"Run a Microsoft Defender scan",
+ desc:"Kick off an on-demand antivirus scan (Windows).",
+ danger:"Full scans are long and CPU/disk heavy.",
+ code:{
+  ps:`Start-MpScan -ScanType QuickScan
+# full: Start-MpScan -ScanType FullScan`,
+  cmd:`"%ProgramFiles%\\Windows Defender\\MpCmdRun.exe" -Scan -ScanType 1`
+ }},
+{id:"sec-defender-update", cat:"Security", title:"Update Defender definitions",
+ desc:"Pull the latest antivirus signatures (Windows).",
+ code:{
+  ps:`Update-MpSignature`,
+  cmd:`"%ProgramFiles%\\Windows Defender\\MpCmdRun.exe" -SignatureUpdate`
+ }},
+{id:"sec-defender-threats", cat:"Security", title:"Defender threat history",
+ desc:"Malware Defender has detected on this machine (Windows).",
+ code:{
+  ps:`Get-MpThreat | Select-Object ThreatName, SeverityID, @{n='Detected';e={$_.InitialDetectionTime}}
+Get-MpThreatDetection | Select-Object -First 20 ThreatID, ActionSuccess, ProcessName, InitialDetectionTime`
+ }},
+{id:"sec-encryption", cat:"Security", title:"Disk encryption status",
+ desc:"Is the disk encrypted — BitLocker / FileVault / LUKS.",
+ code:{
+  ps:`Get-BitLockerVolume |
+  Select-Object MountPoint, VolumeStatus, ProtectionStatus, EncryptionPercentage`,
+  cmd:`manage-bde -status`,
+  mac:`fdesetup status`,
+  linux:`lsblk -o NAME,TYPE,FSTYPE,MOUNTPOINT | grep -i crypt
+# details: sudo cryptsetup status <mapper-name>`
+ }},
+{id:"sec-firewall-rules", cat:"Security", title:"List firewall rules",
+ desc:"Enumerate configured firewall rules.",
+ code:{
+  ps:`Get-NetFirewallRule -Enabled True |
+  Select-Object DisplayName, Direction, Action, Profile |
+  Sort-Object Direction, DisplayName`,
+  cmd:`netsh advfirewall firewall show rule name=all`,
+  mac:`sudo /usr/libexec/ApplicationFirewall/socketfilterfw --listapps
+sudo pfctl -sr 2>/dev/null`,
+  linux:`sudo ufw status numbered 2>/dev/null || sudo iptables -S || sudo nft list ruleset`
+ }},
+{id:"sec-firewall-addrule", cat:"Security", title:"Add a firewall rule",
+ desc:"Allow inbound traffic on a port. Edit port/name.",
+ danger:"Opens an inbound hole in the firewall. Needs admin/root.",
+ code:{
+  ps:`New-NetFirewallRule -DisplayName 'Allow TCP 8080' -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow`,
+  cmd:`netsh advfirewall firewall add rule name="Allow TCP 8080" dir=in action=allow protocol=TCP localport=8080`,
+  mac:`# app-based firewall; allow a binary to accept connections:
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /path/to/app
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp /path/to/app`,
+  linux:`sudo ufw allow 8080/tcp   # or: sudo iptables -A INPUT -p tcp --dport 8080 -j ACCEPT`
+ }},
+{id:"sec-rdp-status", cat:"Security", title:"Remote access (RDP/SSH) status",
+ desc:"Whether remote desktop / remote login is enabled and who may connect.",
+ code:{
+  ps:`$deny=(Get-ItemProperty 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server').fDenyTSConnections
+"RDP enabled: $([bool](1-$deny))"
+Get-LocalGroupMember 'Remote Desktop Users' -ErrorAction SilentlyContinue | Select-Object Name`,
+  cmd:`reg query "HKLM\\System\\CurrentControlSet\\Control\\Terminal Server" /v fDenyTSConnections
+net localgroup "Remote Desktop Users"`,
+  mac:`sudo systemsetup -getremotelogin
+launchctl list com.apple.screensharing >/dev/null 2>&1 && echo "Screen Sharing: on"`,
+  linux:`systemctl is-active sshd ssh 2>/dev/null
+systemctl is-active xrdp 2>/dev/null`
+ }},
+{id:"sec-uac", cat:"Security", title:"UAC configuration",
+ desc:"User Account Control state and elevation prompt behavior (Windows).",
+ code:{
+  ps:`Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' |
+  Select-Object EnableLUA, ConsentPromptBehaviorAdmin, PromptOnSecureDesktop`,
+  cmd:`reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" /v EnableLUA
+reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" /v ConsentPromptBehaviorAdmin`
+ }},
+{id:"sec-secureboot", cat:"Security", title:"Secure Boot & TPM status",
+ desc:"Firmware secure-boot state and TPM/secure-enclave presence. Confirm-SecureBootUEFI needs admin.",
+ code:{
+  ps:`try { "SecureBoot: " + (Confirm-SecureBootUEFI) } catch { "SecureBoot: legacy BIOS or N/A" }
+Get-Tpm | Select-Object TpmPresent, TpmReady, TpmEnabled`,
+  cmd:`tpmtool getdeviceinformation`,
+  mac:`csrutil status
+system_profiler SPiBridgeDataType 2>/dev/null`,
+  linux:`mokutil --sb-state 2>/dev/null
+ls /sys/class/tpm/ 2>/dev/null && echo "TPM present"`
+ }},
+{id:"sec-audit-policy", cat:"Security", title:"Audit / logging policy",
+ desc:"What security events are being audited.",
+ code:{
+  ps:`auditpol /get /category:*`,
+  cmd:`auditpol /get /category:*`,
+  mac:`sudo cat /etc/security/audit_control 2>/dev/null
+sudo launchctl list com.apple.auditd >/dev/null 2>&1 && echo "auditd: on"`,
+  linux:`sudo auditctl -l 2>/dev/null || echo "auditd not installed/active"
+systemctl is-active auditd 2>/dev/null`
+ }},
+
+/* ---------- MAINTENANCE (added) ---------- */
+{id:"mnt-reboot", cat:"Maintenance", title:"Reboot / shutdown (scheduled)",
+ desc:"Restart or power off, optionally after a delay.",
+ danger:"Ends all sessions and reboots/powers off the machine.",
+ code:{
+  ps:`shutdown /r /t 60          # reboot in 60s ; /s = shutdown ; /a = abort
+# immediate: Restart-Computer -Force`,
+  cmd:`shutdown /r /t 60
+:: abort a pending shutdown: shutdown /a`,
+  mac:`sudo shutdown -r +1        # reboot in 1 min ; -h to halt
+# cancel: sudo killall shutdown`,
+  linux:`sudo shutdown -r +1 "rebooting"   # -h to power off
+# cancel: sudo shutdown -c`
+ }},
+{id:"mnt-chkdsk", cat:"Maintenance", title:"Check / repair a disk",
+ desc:"Scan a filesystem for errors. Online scan is safe; repair needs the volume offline.",
+ danger:"Repair (/f, repairVolume, fsck without -n) alters the filesystem and may need a reboot/unmount.",
+ code:{
+  ps:`Repair-Volume -DriveLetter C -Scan
+# offline repair (schedules for reboot): Repair-Volume -DriveLetter C -OfflineScanAndFix`,
+  cmd:`chkdsk C: /scan
+:: full repair (reboot): chkdsk C: /f /r`,
+  mac:`diskutil verifyVolume /
+# repair the boot volume from Recovery: diskutil repairVolume /`,
+  linux:`sudo fsck -n /dev/sda1        # -n = read-only check
+# repair an UNMOUNTED fs: sudo fsck -y /dev/sda1`
+ }},
+{id:"mnt-diskcleanup", cat:"Maintenance", title:"Reclaim disk space",
+ desc:"Clear caches, old updates, and logs to free space.",
+ danger:"Permanently deletes cached files, old package data, and rotated logs.",
+ code:{
+  ps:`cleanmgr /sagerun:1
+Dism /Online /Cleanup-Image /StartComponentCleanup`,
+  cmd:`cleanmgr
+Dism /Online /Cleanup-Image /StartComponentCleanup`,
+  mac:`# thin local Time Machine snapshots + run system maintenance:
+tmutil listlocalsnapshots / 2>/dev/null
+sudo periodic daily weekly monthly`,
+  linux:`sudo journalctl --vacuum-time=7d
+sudo apt-get clean && sudo apt-get autoremove   # Debian/Ubuntu (dnf: sudo dnf clean all)`
+ }},
+{id:"mnt-update-check", cat:"Maintenance", title:"Check / install updates",
+ desc:"List available updates, then optionally install them.",
+ danger:"Installing updates changes software and may force a reboot. Needs admin/root.",
+ code:{
+  ps:`winget upgrade
+# install everything: winget upgrade --all
+# (OS/quality updates: Settings > Windows Update, or the PSWindowsUpdate module)`,
+  cmd:`winget upgrade
+:: install all: winget upgrade --all`,
+  mac:`softwareupdate -l
+# install all: sudo softwareupdate -ia --restart`,
+  linux:`sudo apt update && apt list --upgradable
+# install: sudo apt upgrade -y        (dnf: sudo dnf upgrade)`
+ }},
+{id:"mnt-restore-point", cat:"Maintenance", title:"Create a system restore point",
+ desc:"Snapshot system state before risky changes (Windows; System Restore must be enabled).",
+ danger:"Requires an elevated prompt; no-op if System Protection is disabled for the drive.",
+ code:{
+  ps:`Checkpoint-Computer -Description 'Field service' -RestorePointType MODIFY_SETTINGS`,
+  cmd:`wmic.exe /Namespace:\\\\root\\default Path SystemRestore Call CreateRestorePoint "Field service", 100, 7`
+ }},
+{id:"mnt-gpupdate", cat:"Maintenance", title:"Force Group Policy refresh",
+ desc:"Re-apply machine & user Group Policy immediately (Windows domain).",
+ code:{
+  ps:`gpupdate /force
+# see applied policy: gpresult /r`,
+  cmd:`gpupdate /force
+:: report: gpresult /r`
+ }},
+{id:"mnt-print-queue", cat:"Maintenance", title:"Clear a stuck print queue",
+ desc:"Purge jammed print jobs and bounce the spooler.",
+ danger:"Deletes all pending print jobs. Windows step needs admin.",
+ code:{
+  ps:`Stop-Service Spooler -Force
+Remove-Item "$env:SystemRoot\\System32\\spool\\PRINTERS\\*" -Force -ErrorAction SilentlyContinue
+Start-Service Spooler`,
+  cmd:`net stop spooler
+del /q /f "%SystemRoot%\\System32\\spool\\PRINTERS\\*.*"
+net start spooler`,
+  mac:`cancel -a -        # cancel jobs on all printers (CUPS)`,
+  linux:`cancel -a         # CUPS: cancel all jobs`
+ }},
+{id:"mnt-printers", cat:"Maintenance", title:"List printers & default",
+ desc:"Installed printers and which one is the default.",
+ code:{
+  ps:`Get-Printer | Select-Object Name, DriverName, PortName, Shared, PrinterStatus
+"Default: " + (Get-CimInstance Win32_Printer | Where-Object Default).Name`,
+  cmd:`wmic printer get name,default,portname
+:: wmic deprecated; prefer PowerShell Get-Printer`,
+  mac:`lpstat -p -d`,
+  linux:`lpstat -p -d`
+ }},
+{id:"mnt-event-errors", cat:"Maintenance", title:"Recent system errors & warnings",
+ desc:"Critical/error log entries from the last day — post-incident triage.",
+ code:{
+  ps:`Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2; StartTime=(Get-Date).AddDays(-1)} -MaxEvents 25 |
+  Select-Object TimeCreated, Id, ProviderName, LevelDisplayName`,
+  cmd:`wevtutil qe System /q:"*[System[(Level=1 or Level=2)]]" /c:25 /rd:true /f:text`,
+  mac:`log show --last 1d --predicate 'messageType == 16 || messageType == 17' 2>/dev/null | tail -30`,
+  linux:`journalctl -p err -b --no-pager | tail -30`
+ }},
+{id:"mnt-clip", cat:"Maintenance", title:"Copy output / file to clipboard",
+ desc:"Pipe text or a file straight into the system clipboard.",
+ code:{
+  ps:`Get-Content .\\file.txt -Raw | Set-Clipboard
+# or: "some text" | Set-Clipboard`,
+  cmd:`clip < file.txt
+:: or: echo some text | clip`,
+  mac:`pbcopy < file.txt
+# or: echo "some text" | pbcopy`,
+  linux:`xclip -selection clipboard < file.txt   # X11 (or: wl-copy < file.txt on Wayland)`
+ }},
+
+/* ---------- ACTIVE DIRECTORY (added) — PowerShell; needs RSAT + domain ---------- */
+{id:"ad-userfind", cat:"Active Directory", title:"Find an AD user",
+ desc:"Search AD for a user and key account flags. Needs RSAT ActiveDirectory module + domain.",
+ code:{
+  ps:`Get-ADUser -Filter "Name -like '*smith*'" -Properties Enabled,LockedOut,LastLogonDate |
+  Select-Object Name, SamAccountName, Enabled, LockedOut, LastLogonDate`,
+  cmd:`dsquery user -name "*smith*"`
+ }},
+{id:"ad-unlock", cat:"Active Directory", title:"Unlock / reset an AD account",
+ desc:"Clear a lockout and optionally force a password reset. Needs RSAT + delegated rights.",
+ danger:"Changes another user's account state/credentials — authorized admins only.",
+ code:{
+  ps:`Unlock-ADAccount -Identity jsmith
+# force a reset at next logon:
+Set-ADAccountPassword -Identity jsmith -Reset
+Set-ADUser -Identity jsmith -ChangePasswordAtLogon $true`
+ }},
+{id:"ad-groupmembers", cat:"Active Directory", title:"List AD group members",
+ desc:"Enumerate members of a domain group (recursively). Needs RSAT + domain.",
+ code:{
+  ps:`Get-ADGroupMember -Identity 'Domain Admins' -Recursive |
+  Select-Object Name, SamAccountName, objectClass`,
+  cmd:`net group "Domain Admins" /domain`
+ }},
+{id:"ad-computers", cat:"Active Directory", title:"Find AD computers / last logon",
+ desc:"Domain-joined machines, OS, and last logon — find stale computer accounts. Needs RSAT.",
+ code:{
+  ps:`Get-ADComputer -Filter * -Properties OperatingSystem, LastLogonDate |
+  Select-Object Name, OperatingSystem, LastLogonDate |
+  Sort-Object LastLogonDate`,
+  cmd:`dsquery computer -limit 0`
+ }},
+{id:"ad-repl-health", cat:"Active Directory", title:"Check DC replication health",
+ desc:"Domain controller replication summary and health checks. Run with access to a DC (RSAT).",
+ code:{
+  ps:`repadmin /replsummary
+dcdiag /q`,
+  cmd:`repadmin /replsummary
+dcdiag /q`
+ }},
+
+/* ================= PYTHON EXAMPLES ================= */
+
+{id:"py-var-datatypes", cat:"Python Examples", title:"Basics · Values and data types",
+ desc:"Every value has a type; inspect it with type().",
+ code:{py:`# every value has a type
+print(type(42))        # <class 'int'>
+print(type(3.14))      # <class 'float'>
+print(type("hi"))      # <class 'str'>
+print(type(True))      # <class 'bool'>
+print(type([1, 2]))    # <class 'list'>`}},
+{id:"py-var-operators", cat:"Python Examples", title:"Basics · Operators and operands",
+ desc:"Arithmetic operators combine operands into a new value.",
+ code:{py:`print(7 + 3)     # 10   addition
+print(7 - 3)     # 4
+print(7 * 3)     # 21
+print(7 / 3)     # 2.333...  true division (float)
+print(7 // 3)    # 2    floor division
+print(7 % 3)     # 1    modulo (remainder)
+print(7 ** 3)    # 343  exponent`}},
+{id:"py-var-calls", cat:"Python Examples", title:"Basics · Function calls",
+ desc:"A call runs a function and yields a value usable in a bigger expression.",
+ code:{py:`print(len("hello"))            # 5
+print(max(3, 9, 2))            # 9
+print(abs(-4) + round(2.7))    # 4 + 3 = 7  (calls nested in an expression)`}},
+{id:"py-var-typeconv", cat:"Python Examples", title:"Basics · Type conversion functions",
+ desc:"int(), float(), str(), bool() convert between types.",
+ code:{py:`print(int("42") + 1)     # 43   str -> int
+print(float("3.5"))      # 3.5
+print(str(100) + "%")    # "100%"  int -> str
+print(int(3.9))          # 3    truncates toward zero
+print(bool(0), bool(2))  # False True`}},
+{id:"py-var-variables", cat:"Python Examples", title:"Basics · Variables",
+ desc:"A variable is a name bound to a value.",
+ code:{py:`message = "Hello"
+n = 17
+pi = 3.14159
+print(message, n, pi)`}},
+{id:"py-var-names-keywords", cat:"Python Examples", title:"Basics · Variable names and keywords",
+ desc:"Naming rules, and the reserved words you can't use as names.",
+ code:{py:`# legal: letters, digits, underscore; cannot start with a digit
+count = 0
+_total = 0
+user_name = "sam"
+# reserved keywords cannot be used as names:
+import keyword
+print(keyword.kwlist)   # ['False','None','True','and', ...]`}},
+{id:"py-var-stmt-vs-expr", cat:"Python Examples", title:"Basics · Statements vs. expressions",
+ desc:"An expression has a value; a statement performs an action.",
+ code:{py:`x = 3 + 4          # statement (assignment); 3 + 4 is an expression
+print(x)           # statement that calls print
+(3 + 4)            # an expression alone (value 7, but discarded)
+y = (x * 2) - 1    # expression evaluated, result assigned
+print(y)`}},
+{id:"py-var-precedence", cat:"Python Examples", title:"Basics · Order of operations",
+ desc:"PEMDAS: parentheses, exponent, mul/div, add/sub (left to right).",
+ code:{py:`print(2 + 3 * 4)       # 14, not 20
+print((2 + 3) * 4)     # 20
+print(2 ** 3 ** 2)     # 512  (** is right-associative: 2**(3**2))
+print(10 - 4 - 3)      # 3    (left to right)`}},
+{id:"py-var-reassign", cat:"Python Examples", title:"Basics · Reassignment",
+ desc:"A name can be rebound to a new value (even a new type).",
+ code:{py:`x = 5
+print(x)             # 5
+x = "now a string"   # same name, new value
+print(x)             # now a string`}},
+{id:"py-var-update", cat:"Python Examples", title:"Basics · Updating variables",
+ desc:"Read-modify-write, and the += / -= shorthands.",
+ code:{py:`count = 0
+count = count + 1     # read old value, add, store back
+count += 1            # shorthand for the same
+total = 100
+total -= 25           # 75
+print(count, total)`}},
+{id:"py-var-input", cat:"Python Examples", title:"Basics · Input",
+ desc:"input() reads a line from the keyboard and always returns a string.",
+ code:{py:`# input() always returns a string
+name = input("Your name: ")
+print("Hi", name)
+# convert when you need a number:
+age = int(input("Your age: "))
+print("Next year:", age + 1)`}},
+
+{id:"py-err-syntax", cat:"Python Examples", title:"Errors · Syntax errors",
+ desc:"Malformed code Python can't parse; the program won't start.",
+ code:{py:`# a syntax error stops the program before it runs (shown here as comments)
+# print("hi"      <- SyntaxError: '(' was never closed
+# if x  == 1      <- SyntaxError: expected ':'
+print("Fix the punctuation, then the file will run.")`}},
+{id:"py-err-runtime", cat:"Python Examples", title:"Errors · Runtime errors",
+ desc:"Errors raised while running, at a specific line (exceptions).",
+ code:{py:`nums = [1, 2, 3]
+# print(nums[5])   # IndexError at runtime
+print(10 / 2)      # runs fine
+# print(10 / 0)    # ZeroDivisionError at runtime`}},
+{id:"py-err-semantic", cat:"Python Examples", title:"Errors · Semantic errors",
+ desc:"Runs without error but produces the wrong answer (a logic bug).",
+ code:{py:`# want the average of 2 and 4:
+avg = 2 + 4 / 2      # BUG: gives 4.0 (precedence), not 3.0
+print(avg)           # 4.0  <- wrong
+avg = (2 + 4) / 2    # fixed
+print(avg)           # 3.0`}},
+{id:"py-err-syntaxerror", cat:"Python Examples", title:"Errors · SyntaxError",
+ desc:"Common causes of the SyntaxError Python raises at parse time.",
+ code:{py:`# SyntaxError: code Python can't parse. Common causes:
+#   missing ':'      ->  if x > 0
+#   unmatched ()     ->  print("hi"
+#   invalid target   ->  5 = x
+print("the examples above are shown as comments so this file still runs")`}},
+{id:"py-err-typeerror", cat:"Python Examples", title:"Errors · TypeError",
+ desc:"An operation applied to the wrong type.",
+ code:{py:`try:
+    result = "age: " + 30      # can't concatenate str and int
+except TypeError as e:
+    print("TypeError:", e)
+print("fix:", "age: " + str(30))`}},
+{id:"py-err-nameerror", cat:"Python Examples", title:"Errors · NameError",
+ desc:"Using a name that was never defined (often a typo).",
+ code:{py:`try:
+    print(totl)        # meant 'total'
+except NameError as e:
+    print("NameError:", e)
+total = 10
+print(total)`}},
+{id:"py-err-valueerror", cat:"Python Examples", title:"Errors · ValueError",
+ desc:"Right type, but an inappropriate value.",
+ code:{py:`try:
+    n = int("twelve")     # can't parse this as an int
+except ValueError as e:
+    print("ValueError:", e)
+print(int("12"))          # works`}},
+
+{id:"py-mod-import", cat:"Python Examples", title:"Modules · Importing modules",
+ desc:"import, from-import, and aliasing with as.",
+ code:{py:`import math                     # whole module
+from random import randint      # one name from a module
+import statistics as stats      # with an alias
+print(math.sqrt(16))            # 4.0
+print(randint(1, 6))            # a die roll
+print(stats.mean([2, 4, 6]))    # 4`}},
+{id:"py-mod-random", cat:"Python Examples", title:"Modules · The random module",
+ desc:"Random floats, integers, choices, and in-place shuffle.",
+ code:{py:`import random
+print(random.random())            # float in [0.0, 1.0)
+print(random.randint(1, 6))       # int 1..6 inclusive
+print(random.choice(["a", "b", "c"]))
+deck = [1, 2, 3, 4, 5]
+random.shuffle(deck)              # shuffles in place
+print(deck)`}},
+
+{id:"py-turtle", cat:"Python Examples", title:"Turtle · The turtle module",
+ desc:"Instances, attributes, and methods; opens a graphics window.",
+ code:{py:`import turtle
+wn = turtle.Screen()      # a Screen instance
+t = turtle.Turtle()       # a Turtle instance (object)
+t.color("blue")           # set drawing state via methods
+t.pensize(3)
+for _ in range(4):        # draw a square by calling methods
+    t.forward(100)
+    t.right(90)
+wn.mainloop()             # keep the window open`}},
+
+{id:"py-seq-types", cat:"Python Examples", title:"Sequences · Strings, lists, tuples",
+ desc:"Three sequence types: str and tuple are immutable, list is mutable.",
+ code:{py:`s = "hello"            # string  (immutable sequence of chars)
+lst = [1, 2, 3]        # list    (mutable sequence)
+tup = (4, 5, 6)        # tuple   (immutable sequence)
+print(s, lst, tup)
+print(type(s), type(lst), type(tup))`}},
+{id:"py-seq-index", cat:"Python Examples", title:"Sequences · Index operator",
+ desc:"Access an item by position; indexing starts at 0, negatives count from the end.",
+ code:{py:`s = "PYTHON"
+print(s[0])    # 'P'  first item
+print(s[2])    # 'T'
+print(s[-1])   # 'N'  last item
+data = [10, 20, 30]
+print(data[1]) # 20`}},
+{id:"py-seq-len", cat:"Python Examples", title:"Sequences · Length (len)",
+ desc:"len() returns the number of items in a sequence.",
+ code:{py:`print(len("hello"))       # 5
+print(len([1, 2, 3, 4]))  # 4
+print(len(()))            # 0
+word = "banana"
+print(word[len(word) - 1])   # last char via len`}},
+{id:"py-seq-slice", cat:"Python Examples", title:"Sequences · Slice operator",
+ desc:"start:stop:step returns a sub-sequence (stop excluded).",
+ code:{py:`s = "abcdefg"
+print(s[1:4])    # 'bcd'   start:stop
+print(s[:3])     # 'abc'   from start
+print(s[4:])     # 'efg'   to end
+print(s[::2])    # 'aceg'  step
+print(s[::-1])   # 'gfedcba' reversed`}},
+{id:"py-seq-concat-repeat", cat:"Python Examples", title:"Sequences · Concatenation and repetition",
+ desc:"+ joins sequences; * repeats them.",
+ code:{py:`print([1, 2] + [3, 4])   # [1, 2, 3, 4]  concatenation
+print("ab" + "cd")       # 'abcd'
+print("=" * 10)          # '=========='  repetition
+print([0] * 3)           # [0, 0, 0]`}},
+{id:"py-seq-count-index", cat:"Python Examples", title:"Sequences · count and index",
+ desc:"count() tallies occurrences; index() finds the first position.",
+ code:{py:`nums = [1, 2, 2, 3, 2]
+print(nums.count(2))     # 3   how many times 2 appears
+print(nums.index(3))     # 3   position of first 3
+print("banana".count("a"))  # 3
+print("banana".index("n"))  # 2`}},
+{id:"py-seq-split-join", cat:"Python Examples", title:"Sequences · Splitting and joining strings",
+ desc:"split() a string into a list; join() a list into a string.",
+ code:{py:`csv = "sam,42,blue"
+parts = csv.split(",")        # ['sam', '42', 'blue']
+print(parts)
+sentence = "the quick fox"
+print(sentence.split())       # splits on whitespace
+joined = "-".join(["2024", "01", "15"])
+print(joined)                 # '2024-01-15'`}},
+
+{id:"py-for-loop", cat:"Python Examples", title:"For loops · The for loop",
+ desc:"Run a block once for each item in a sequence.",
+ code:{py:`for i in [1, 2, 3]:
+    print("count:", i)
+print("done")`}},
+{id:"py-for-strings", cat:"Python Examples", title:"For loops · Iterating over strings",
+ desc:"A string is iterable one character at a time.",
+ code:{py:`for ch in "cat":
+    print(ch)          # c, a, t on separate lines`}},
+{id:"py-for-lists", cat:"Python Examples", title:"For loops · Iterating over lists",
+ desc:"Loop directly over list elements.",
+ code:{py:`fruits = ["apple", "pear", "fig"]
+for fruit in fruits:
+    print(fruit.upper())`}},
+{id:"py-for-range", cat:"Python Examples", title:"For loops · The range function",
+ desc:"range(start, stop, step) generates a sequence of integers.",
+ code:{py:`print(list(range(5)))        # [0, 1, 2, 3, 4]
+print(list(range(2, 8)))     # [2, 3, 4, 5, 6, 7]
+print(list(range(0, 10, 2))) # [0, 2, 4, 6, 8]
+for i in range(3):
+    print("i =", i)`}},
+{id:"py-for-accumulator", cat:"Python Examples", title:"For loops · The accumulator pattern",
+ desc:"Initialize a total, update it each pass, use it after the loop.",
+ code:{py:`total = 0                 # initialize accumulator
+for n in [4, 7, 1, 9]:
+    total = total + n     # update each pass
+print("sum:", total)      # 21`}},
+{id:"py-for-index", cat:"Python Examples", title:"For loops · Traversal by index",
+ desc:"Loop over range(len(seq)) when you need positions.",
+ code:{py:`letters = ["a", "b", "c"]
+for i in range(len(letters)):
+    print(i, letters[i])      # index and value`}},
+{id:"py-for-nested", cat:"Python Examples", title:"For loops · Nested iteration",
+ desc:"A loop inside a loop — the inner runs fully each outer pass.",
+ code:{py:`for row in range(1, 4):
+    for col in range(1, 4):
+        print(f"{row}x{col}={row*col}", end="  ")
+    print()               # newline after each row`}},
+
+{id:"py-cond-bool", cat:"Python Examples", title:"Conditionals · Boolean values and expressions",
+ desc:"Comparisons produce True/False of type bool.",
+ code:{py:`print(5 > 3)        # True
+print(5 == 3)       # False
+print(5 != 3)       # True
+x = 10
+print(x >= 10)      # True
+print(type(True))   # <class 'bool'>`}},
+{id:"py-cond-logical", cat:"Python Examples", title:"Conditionals · Logical operators (and/or/not)",
+ desc:"Combine booleans with and, or, not.",
+ code:{py:`print(True and False)   # False  (both must be true)
+print(True or False)    # True   (either)
+print(not True)         # False
+age = 25
+print(age > 18 and age < 65)   # True`}},
+{id:"py-cond-shortcircuit", cat:"Python Examples", title:"Conditionals · Short-circuit evaluation",
+ desc:"'and' stops at the first False, 'or' at the first True — the rest is skipped.",
+ code:{py:`def loud():
+    print("evaluated!")
+    return True
+print(False and loud())   # loud() never runs -> False
+print(True or loud())     # loud() never runs -> True
+# use it as a guard:
+x = 0
+print(x != 0 and (10 / x) > 1)   # right side skipped, no ZeroDivisionError`}},
+{id:"py-cond-in", cat:"Python Examples", title:"Conditionals · in and not in operators",
+ desc:"Test membership in a sequence or dict.",
+ code:{py:`print("a" in "cat")            # True
+print(3 in [1, 2, 3])          # True
+print("z" not in "cat")        # True
+print("key" in {"key": 1})     # True (checks dict keys)`}},
+{id:"py-cond-precedence", cat:"Python Examples", title:"Conditionals · Operator precedence",
+ desc:"Arithmetic, then comparisons, then not, and, or.",
+ code:{py:`print(2 + 3 == 5)              # True  (arithmetic before ==)
+print(True or False and False) # True  (and before or)
+print(not 5 > 3)               # False (> before not)`}},
+{id:"py-cond-ifelse", cat:"Python Examples", title:"Conditionals · Binary selection (if/else)",
+ desc:"Choose between exactly two paths.",
+ code:{py:`n = 7
+if n % 2 == 0:
+    print("even")
+else:
+    print("odd")`}},
+{id:"py-cond-if", cat:"Python Examples", title:"Conditionals · Unary selection (if only)",
+ desc:"Run a block only when a condition is true.",
+ code:{py:`temp = 95
+if temp > 90:
+    print("It's hot!")     # runs only when condition is True
+print("done")              # always runs`}},
+{id:"py-cond-nested", cat:"Python Examples", title:"Conditionals · Nested conditionals",
+ desc:"An if inside another if.",
+ code:{py:`x = 5
+if x >= 0:
+    if x == 0:
+        print("zero")
+    else:
+        print("positive")
+else:
+    print("negative")`}},
+{id:"py-cond-elif", cat:"Python Examples", title:"Conditionals · Chained conditionals (elif)",
+ desc:"Test several conditions in order; the first true one wins.",
+ code:{py:`score = 82
+if score >= 90:
+    grade = "A"
+elif score >= 80:
+    grade = "B"
+elif score >= 70:
+    grade = "C"
+else:
+    grade = "F"
+print(grade)      # B`}},
+{id:"py-cond-accum-max", cat:"Python Examples", title:"Conditionals · Accumulator with conditionals (max)",
+ desc:"Track a running best value with a conditional update.",
+ code:{py:`nums = [3, 41, 12, 9, 74, 15]
+biggest = nums[0]              # start with the first
+for n in nums:
+    if n > biggest:           # conditional update
+        biggest = n
+print("max:", biggest)        # 74`}},
+
+{id:"py-mut-mutability", cat:"Python Examples", title:"Mutation · Mutability vs. immutability",
+ desc:"Lists can be changed in place; strings and tuples cannot.",
+ code:{py:`lst = [1, 2, 3]
+lst[0] = 99          # OK: lists are mutable
+print(lst)           # [99, 2, 3]
+s = "abc"
+# s[0] = "z"         # TypeError: strings are immutable
+s = "zbc"            # must rebuild instead
+print(s)`}},
+{id:"py-mut-del", cat:"Python Examples", title:"Mutation · List element deletion (del)",
+ desc:"Remove items by index or slice with del.",
+ code:{py:`lst = ["a", "b", "c", "d"]
+del lst[1]           # remove by index
+print(lst)           # ['a', 'c', 'd']
+del lst[0:2]         # remove a slice
+print(lst)           # ['d']`}},
+{id:"py-mut-refs", cat:"Python Examples", title:"Mutation · Objects and references",
+ desc:"A variable holds a reference to an object; is vs ==.",
+ code:{py:`a = [1, 2, 3]
+b = a                 # b refers to the SAME object
+print(a is b)         # True
+c = [1, 2, 3]
+print(a == c)         # True  (same contents)
+print(a is c)         # False (different objects)`}},
+{id:"py-mut-aliasing", cat:"Python Examples", title:"Mutation · Aliasing",
+ desc:"Two names for one mutable object — changes show through both.",
+ code:{py:`a = [1, 2, 3]
+b = a                # alias: two names, one list
+b.append(4)
+print(a)             # [1, 2, 3, 4]  <- change shows through 'a' too`}},
+{id:"py-mut-clone", cat:"Python Examples", title:"Mutation · Cloning lists",
+ desc:"Make an independent copy so mutations don't leak.",
+ code:{py:`a = [1, 2, 3]
+b = a[:]             # slice makes a copy
+b.append(4)
+print(a)             # [1, 2, 3]      unchanged
+print(b)             # [1, 2, 3, 4]
+# also: b = list(a)  or  b = a.copy()`}},
+{id:"py-mut-listmethods", cat:"Python Examples", title:"Mutation · Mutating list methods",
+ desc:"append, insert, remove, pop, sort change the list in place.",
+ code:{py:`lst = [3, 1, 2]
+lst.append(4)        # add to end
+lst.insert(0, 0)     # insert at index
+lst.remove(1)        # remove first matching value
+popped = lst.pop()   # remove & return last
+lst.sort()           # sort in place
+print(lst, "popped:", popped)`}},
+{id:"py-mut-append-vs-concat", cat:"Python Examples", title:"Mutation · Append vs. concatenate",
+ desc:"append mutates in place; + builds a new list.",
+ code:{py:`a = [1, 2]
+a.append(3)          # mutates a in place -> [1, 2, 3]
+print(a)
+b = [1, 2]
+b = b + [3]          # builds a NEW list, rebinds b
+print(b)             # [1, 2, 3]`}},
+{id:"py-mut-strmethods", cat:"Python Examples", title:"Mutation · Non-mutating string methods",
+ desc:"String methods return new strings; the original is unchanged.",
+ code:{py:`s = "Hello, World"
+print(s.upper())     # 'HELLO, WORLD'  (returns new string)
+print(s.lower())
+print(s.replace("l", "L"))
+print(s.strip())
+print(s)             # original unchanged: 'Hello, World'`}},
+{id:"py-mut-format", cat:"Python Examples", title:"Mutation · String .format() method",
+ desc:"Fill {} placeholders positionally or by name.",
+ code:{py:`name, score = "Sam", 95
+print("{} scored {}".format(name, score))
+print("{0} + {0} = {1}".format(2, 4))       # positional
+print("{n} is {a}".format(n="Ana", a=30))   # named
+print("{:.2f}".format(3.14159))             # '3.14'`}},
+{id:"py-mut-fstrings", cat:"Python Examples", title:"Mutation · f-strings",
+ desc:"Inline expressions and formatting inside f\"...\".",
+ code:{py:`name, score = "Sam", 95
+print(f"{name} scored {score}")
+print(f"{2} + {2} = {2 + 2}")     # expressions inside
+pi = 3.14159
+print(f"{pi:.2f}")                # '3.14'
+print(f"{name!r}")               # 'Sam' with quotes (repr)`}},
+{id:"py-mut-accum-list", cat:"Python Examples", title:"Mutation · Accumulator pattern with lists",
+ desc:"Start empty, append each computed item.",
+ code:{py:`squares = []                 # start empty
+for n in range(1, 6):
+    squares.append(n * n)    # accumulate items
+print(squares)               # [1, 4, 9, 16, 25]`}},
+{id:"py-mut-accum-str", cat:"Python Examples", title:"Mutation · Accumulator pattern with strings",
+ desc:"Build a string up piece by piece.",
+ code:{py:`acronym = ""                       # start empty
+for word in ["Portable", "Network", "Graphics"]:
+    acronym = acronym + word[0]    # build up
+print(acronym)                     # 'PNG'`}},
+
+{id:"py-file-read", cat:"Python Examples", title:"Files · Reading a file",
+ desc:"read() loads the whole file into one string. Needs the file to exist.",
+ code:{py:`with open("notes.txt", "r") as f:
+    contents = f.read()
+print(contents)`}},
+{id:"py-file-read-alt", cat:"Python Examples", title:"Files · Alternative file-reading methods",
+ desc:"readline() reads one line; readlines() returns a list of lines.",
+ code:{py:`with open("notes.txt", "r") as f:
+    line = f.readline()      # one line (keeps trailing newline)
+    print(line.rstrip())
+with open("notes.txt", "r") as f:
+    lines = f.readlines()    # list of all lines
+    print(len(lines), "lines")`}},
+{id:"py-file-iter", cat:"Python Examples", title:"Files · Iterating over lines in a file",
+ desc:"Loop the file object directly — memory-friendly.",
+ code:{py:`with open("notes.txt", "r") as f:
+    for line in f:                 # line by line
+        print(line.rstrip())       # rstrip drops the newline`}},
+{id:"py-file-with", cat:"Python Examples", title:"Files · Using with (context manager)",
+ desc:"with auto-closes the file, even if an error occurs.",
+ code:{py:`with open("notes.txt", "r") as f:
+    data = f.read()
+# f is closed automatically here
+print("closed?", f.closed)         # True`}},
+{id:"py-file-write", cat:"Python Examples", title:"Files · Writing text files",
+ desc:"Open in 'w' (truncate/create) or 'a' (append), then write().",
+ danger:"Creates/overwrites out.txt in the working directory.",
+ code:{py:`with open("out.txt", "w") as f:
+    f.write("line one\\n")
+    f.write("line two\\n")
+print("wrote out.txt")`}},
+{id:"py-file-csv-format", cat:"Python Examples", title:"Files · CSV format",
+ desc:"Comma-separated values: one record per line, fields split on commas.",
+ code:{py:`sample = "name,age,city\\nSam,42,Denver\\nAna,30,Reno"
+for line in sample.split("\\n"):
+    fields = line.split(",")
+    print(fields)`}},
+{id:"py-file-csv-read", cat:"Python Examples", title:"Files · Reading data from a CSV",
+ desc:"csv.reader yields each row as a list of strings.",
+ code:{py:`import csv
+with open("people.csv", newline="") as f:
+    reader = csv.reader(f)
+    header = next(reader)          # first row = column names
+    print("columns:", header)
+    for row in reader:
+        print(row)                 # each row is a list of strings`}},
+{id:"py-file-csv-write", cat:"Python Examples", title:"Files · Writing data to a CSV",
+ desc:"csv.writer serializes rows correctly (quoting, commas).",
+ danger:"Creates/overwrites people.csv in the working directory.",
+ code:{py:`import csv
+rows = [["name", "age"], ["Sam", 42], ["Ana", 30]]
+with open("people.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerows(rows)         # write all rows at once
+print("wrote people.csv")`}},
+
+{id:"py-dict-intro", cat:"Python Examples", title:"Dictionaries · Dictionaries",
+ desc:"Store key -> value pairs; look up by key.",
+ code:{py:`ages = {"Sam": 42, "Ana": 30}
+print(ages["Sam"])        # 42
+ages["Kim"] = 25          # add a pair
+print(ages)`}},
+{id:"py-dict-ops", cat:"Python Examples", title:"Dictionaries · Dictionary operations",
+ desc:"Add/update, delete, membership, and length.",
+ code:{py:`d = {"a": 1, "b": 2}
+d["c"] = 3            # add / update
+del d["a"]           # delete a key
+print("b" in d)      # True  (membership tests keys)
+print(len(d))        # 2`}},
+{id:"py-dict-methods", cat:"Python Examples", title:"Dictionaries · Dictionary methods",
+ desc:"keys(), values(), items(), get().",
+ code:{py:`d = {"a": 1, "b": 2}
+print(list(d.keys()))     # ['a', 'b']
+print(list(d.values()))   # [1, 2]
+print(list(d.items()))    # [('a', 1), ('b', 2)]
+print(d.get("z", 0))      # 0 default`}},
+{id:"py-dict-iter", cat:"Python Examples", title:"Dictionaries · Iterating over dictionaries",
+ desc:"Looping a dict yields keys; use items() for key+value.",
+ code:{py:`scores = {"Sam": 95, "Ana": 88}
+for name in scores:                 # iterates keys
+    print(name, scores[name])
+for name, score in scores.items():  # key and value
+    print(f"{name}: {score}")`}},
+{id:"py-dict-get", cat:"Python Examples", title:"Dictionaries · Safely retrieving values (.get)",
+ desc:".get() returns a default instead of raising KeyError.",
+ code:{py:`d = {"a": 1}
+print(d.get("a"))        # 1
+print(d.get("z"))        # None (no KeyError)
+print(d.get("z", 0))     # 0   supply a default`}},
+{id:"py-dict-alias-copy", cat:"Python Examples", title:"Dictionaries · Aliasing and copying",
+ desc:"Assignment aliases; .copy() makes an independent dict.",
+ code:{py:`a = {"x": 1}
+b = a                 # alias: same dict
+b["y"] = 2
+print(a)              # {'x': 1, 'y': 2}  changed too
+c = a.copy()          # independent copy
+c["z"] = 9
+print(a)              # unchanged by c`}},
+{id:"py-dict-accum", cat:"Python Examples", title:"Dictionaries · Accumulating results in a dictionary",
+ desc:"Tally counts using get() with a default.",
+ code:{py:`text = "to be or not to be"
+counts = {}
+for word in text.split():
+    counts[word] = counts.get(word, 0) + 1   # tally
+print(counts)     # {'to': 2, 'be': 2, 'or': 1, 'not': 1}`}},
+{id:"py-dict-best-key", cat:"Python Examples", title:"Dictionaries · Accumulating the best key",
+ desc:"Scan a dict to find the key with the largest value.",
+ code:{py:`counts = {"to": 2, "be": 2, "or": 1, "not": 1}
+best = None
+for word in counts:
+    if best is None or counts[word] > counts[best]:
+        best = word            # track key with the largest value
+print("most common:", best)`}},
+
+{id:"py-fn-def", cat:"Python Examples", title:"Functions · Function definition",
+ desc:"def creates a function; defining it doesn't run it.",
+ code:{py:`def greet():
+    print("Hello!")
+    print("Welcome.")
+# defining does not run it
+greet()          # now it runs`}},
+{id:"py-fn-invoke", cat:"Python Examples", title:"Functions · Function invocation",
+ desc:"Call a function with (); calls can nest.",
+ code:{py:`def square(x):
+    return x * x
+print(square(5))            # 25
+print(square(square(3)))   # square(9) -> 81`}},
+{id:"py-fn-params", cat:"Python Examples", title:"Functions · Parameters",
+ desc:"Parameters receive arguments positionally or by keyword.",
+ code:{py:`def power(base, exp):        # two parameters
+    return base ** exp
+print(power(2, 10))          # 1024  (positional args)
+print(power(exp=3, base=2))  # 8     (keyword args)`}},
+{id:"py-fn-return", cat:"Python Examples", title:"Functions · Returning a value",
+ desc:"return sends a value back to the caller.",
+ code:{py:`def add(a, b):
+    return a + b       # hands a value back
+total = add(3, 4)
+print(total)           # 7`}},
+{id:"py-fn-annotations", cat:"Python Examples", title:"Functions · Type annotations",
+ desc:"Document parameter/return types; Python does not enforce them.",
+ code:{py:`def repeat(text: str, times: int) -> str:
+    return text * times
+print(repeat("ab", 3))     # 'ababab'`}},
+{id:"py-fn-accum", cat:"Python Examples", title:"Functions · A function that accumulates",
+ desc:"Wrap the accumulator pattern in a reusable function.",
+ code:{py:`def total(nums):
+    acc = 0
+    for n in nums:
+        acc += n
+    return acc
+print(total([1, 2, 3, 4]))   # 10`}},
+{id:"py-fn-local", cat:"Python Examples", title:"Functions · Local scope",
+ desc:"Variables/parameters live only inside the function.",
+ code:{py:`def f():
+    x = 10        # local to f
+    print(x)
+f()
+# print(x)        # NameError: x doesn't exist out here`}},
+{id:"py-fn-global", cat:"Python Examples", title:"Functions · Global variables",
+ desc:"global lets a function rebind a module-level name.",
+ code:{py:`count = 0
+def bump():
+    global count      # rebind the module-level name
+    count += 1
+bump(); bump()
+print(count)          # 2`}},
+{id:"py-fn-composition", cat:"Python Examples", title:"Functions · Composition",
+ desc:"Feed one function's result into another.",
+ code:{py:`def double(x): return x * 2
+def inc(x):    return x + 1
+print(double(inc(4)))     # double(5) -> 10`}},
+{id:"py-fn-print-vs-return", cat:"Python Examples", title:"Functions · Print vs. return",
+ desc:"print shows a value; return hands it back (a printing function returns None).",
+ code:{py:`def add_p(a, b): print(a + b)    # shows it, returns None
+def add_r(a, b): return a + b    # hands value back
+x = add_p(2, 3)     # prints 5
+print("got:", x)    # got: None
+y = add_r(2, 3)
+print("got:", y)    # got: 5`}},
+{id:"py-fn-mutable-args", cat:"Python Examples", title:"Functions · Passing mutable objects",
+ desc:"A function can mutate a list/dict passed to it.",
+ code:{py:`def add_item(lst):
+    lst.append("new")     # mutates the caller's list
+items = ["a"]
+add_item(items)
+print(items)              # ['a', 'new']`}},
+{id:"py-fn-side-effects", cat:"Python Examples", title:"Functions · Side effects",
+ desc:"Changing state outside the function (printing, mutating, files).",
+ code:{py:`log = []
+def record(msg):
+    log.append(msg)       # side effect: mutates outer list
+    print(msg)            # side effect: output
+record("start")
+print(log)                # ['start']`}},
+
+{id:"py-tup-packing", cat:"Python Examples", title:"Tuples · Tuple packing",
+ desc:"Comma-separated values pack into a tuple (parens optional).",
+ code:{py:`point = 3, 4          # -> (3, 4)
+print(point)
+print(type(point))    # <class 'tuple'>`}},
+{id:"py-tup-unpack", cat:"Python Examples", title:"Tuples · Tuple assignment with unpacking",
+ desc:"Spread a tuple across several names at once.",
+ code:{py:`point = (3, 4)
+x, y = point          # unpack into two names
+print(x, y)           # 3 4`}},
+{id:"py-tup-swap", cat:"Python Examples", title:"Tuples · Swapping values",
+ desc:"Swap two variables in one line, no temp needed.",
+ code:{py:`a, b = 1, 2
+a, b = b, a           # swap
+print(a, b)           # 2 1`}},
+{id:"py-tup-iter-unpack", cat:"Python Examples", title:"Tuples · Unpacking into iterator variables",
+ desc:"Unpack each tuple as you loop a list of tuples.",
+ code:{py:`pairs = [(1, "a"), (2, "b"), (3, "c")]
+for num, letter in pairs:      # unpack each tuple
+    print(num, letter)`}},
+{id:"py-tup-enumerate", cat:"Python Examples", title:"Tuples · enumerate",
+ desc:"Loop with both an index and the value.",
+ code:{py:`for i, item in enumerate(["a", "b", "c"]):
+    print(i, item)             # 0 a / 1 b / 2 c
+for i, item in enumerate(["x", "y"], start=1):
+    print(i, item)             # 1 x / 2 y`}},
+{id:"py-tup-return", cat:"Python Examples", title:"Tuples · Tuples as return values",
+ desc:"Return several values as a tuple, then unpack them.",
+ code:{py:`def min_max(nums):
+    return min(nums), max(nums)   # returns a tuple
+lo, hi = min_max([4, 1, 8, 3])
+print(lo, hi)                     # 1 8`}},
+{id:"py-tup-arg-unpack", cat:"Python Examples", title:"Tuples · Unpacking tuples as function arguments",
+ desc:"* spreads a tuple into positional arguments.",
+ code:{py:`def add(a, b, c):
+    return a + b + c
+args = (1, 2, 3)
+print(add(*args))       # -> add(1, 2, 3) -> 6`}},
+
+{id:"py-while", cat:"Python Examples", title:"While loops · The while statement",
+ desc:"Repeat while a condition stays true; move toward the exit.",
+ code:{py:`n = 5
+while n > 0:
+    print(n)
+    n -= 1              # must progress toward stopping
+print("liftoff")`}},
+{id:"py-while-listener", cat:"Python Examples", title:"While loops · The listener loop",
+ desc:"Keep reading input until told to stop. Reads from the keyboard.",
+ code:{py:`while True:
+    cmd = input("command (quit to exit): ")
+    if cmd == "quit":
+        break
+    print("you said:", cmd)`}},
+{id:"py-while-sentinel", cat:"Python Examples", title:"While loops · Sentinel values",
+ desc:"A special value signals the loop to end. Reads from the keyboard.",
+ code:{py:`total = 0
+while True:
+    entry = input("number (blank to finish): ")
+    if entry == "":            # sentinel
+        break
+    total += int(entry)
+print("total:", total)`}},
+{id:"py-while-validation", cat:"Python Examples", title:"While loops · Input validation",
+ desc:"Loop until the input passes a check. Reads from the keyboard.",
+ code:{py:`while True:
+    age = input("Age (0-120): ")
+    if age.isdigit() and 0 <= int(age) <= 120:
+        break
+    print("try again")
+print("ok:", age)`}},
+{id:"py-while-break-continue", cat:"Python Examples", title:"While loops · break and continue",
+ desc:"break exits the loop; continue skips to the next pass.",
+ code:{py:`for n in range(1, 10):
+    if n == 3:
+        continue        # skip the rest of THIS pass
+    if n == 6:
+        break           # exit the loop entirely
+    print(n)            # 1, 2, 4, 5`}},
+
+{id:"py-adv-optional", cat:"Python Examples", title:"Adv. functions · Optional parameters",
+ desc:"Give a parameter a default so callers may omit it.",
+ code:{py:`def greet(name, greeting="Hello"):
+    print(greeting, name)
+greet("Sam")                 # Hello Sam
+greet("Ana", "Hi")           # Hi Ana`}},
+{id:"py-adv-keyword", cat:"Python Examples", title:"Adv. functions · Keyword parameters",
+ desc:"Pass arguments by name, in any order.",
+ code:{py:`def box(width, height, fill="."):
+    print(f"{width}x{height} filled with {fill}")
+box(height=2, width=5)          # order-independent
+box(3, 3, fill="#")`}},
+{id:"py-adv-lambda", cat:"Python Examples", title:"Adv. functions · Anonymous functions (lambda)",
+ desc:"A small inline function, often used as a key.",
+ code:{py:`square = lambda x: x * x       # tiny inline function
+print(square(6))               # 36
+pts = [(1, 5), (3, 2), (2, 8)]
+print(sorted(pts, key=lambda p: p[1]))   # sort by 2nd item`}},
+{id:"py-adv-methods", cat:"Python Examples", title:"Adv. functions · Method invocations",
+ desc:"Methods are functions on an object, called with dot syntax.",
+ code:{py:`s = "hello"
+print(s.upper())        # 'HELLO'
+nums = [3, 1, 2]
+nums.sort()             # method mutates the list
+print(nums)`}},
+{id:"py-adv-decorator", cat:"Python Examples", title:"Adv. functions · Function wrapping and decorators",
+ desc:"A decorator wraps a function to extend its behavior.",
+ code:{py:`def shout(func):                 # wraps another function
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs).upper()
+    return wrapper
+
+@shout
+def greet(name):
+    return f"hi {name}"
+print(greet("sam"))              # 'HI SAM'`}},
+
+{id:"py-sort-basics", cat:"Python Examples", title:"Sorting · sort and sorted",
+ desc:"sorted() returns a new list; .sort() sorts in place.",
+ code:{py:`nums = [3, 1, 2]
+print(sorted(nums))     # [1, 2, 3]  new list
+print(nums)             # [3, 1, 2]  unchanged
+nums.sort()             # in place, returns None
+print(nums)             # [1, 2, 3]`}},
+{id:"py-sort-reverse", cat:"Python Examples", title:"Sorting · reverse parameter",
+ desc:"reverse=True sorts high to low.",
+ code:{py:`nums = [1, 2, 3]
+print(sorted(nums, reverse=True))    # [3, 2, 1]
+words = ["b", "a", "c"]
+words.sort(reverse=True)
+print(words)                          # ['c', 'b', 'a']`}},
+{id:"py-sort-key", cat:"Python Examples", title:"Sorting · key parameter",
+ desc:"key= sorts by a computed value for each item.",
+ code:{py:`words = ["banana", "kiwi", "apple"]
+print(sorted(words, key=len))          # by length
+print(sorted(words, key=str.lower))    # case-insensitive`}},
+{id:"py-sort-dict", cat:"Python Examples", title:"Sorting · Sorting a dictionary",
+ desc:"Sort by key, or sort items() by value.",
+ code:{py:`scores = {"Sam": 88, "Ana": 95, "Kim": 72}
+print(sorted(scores))          # keys: ['Ana','Kim','Sam']
+print(sorted(scores.items(), key=lambda kv: kv[1], reverse=True))`}},
+{id:"py-sort-tiebreak", cat:"Python Examples", title:"Sorting · Breaking ties (secondary sort)",
+ desc:"A tuple key sorts by the first field, then the second for ties.",
+ code:{py:`people = [("Sam", 30), ("Ana", 30), ("Kim", 25)]
+# sort by age, then name for ties:
+print(sorted(people, key=lambda p: (p[1], p[0])))`}},
+
+{id:"py-nest-complex-items", cat:"Python Examples", title:"Nested data · Lists with complex items",
+ desc:"Lists whose items are themselves lists.",
+ code:{py:`students = [
+    ["Sam", [90, 85]],
+    ["Ana", [70, 95]],
+]
+for name, grades in students:
+    print(name, "avg:", sum(grades) / len(grades))`}},
+{id:"py-nest-dicts", cat:"Python Examples", title:"Nested data · Nested dictionaries",
+ desc:"Dicts of dicts; drill in with chained keys.",
+ code:{py:`users = {
+    "sam": {"age": 42, "roles": ["admin"]},
+    "ana": {"age": 30, "roles": ["user", "dev"]},
+}
+print(users["ana"]["age"])          # 30
+print(users["ana"]["roles"][1])     # 'dev'`}},
+{id:"py-nest-json", cat:"Python Examples", title:"Nested data · Processing JSON results",
+ desc:"json.loads parses a JSON string into nested dicts/lists.",
+ code:{py:`import json
+text = '{"name": "Sam", "langs": ["py", "js"], "active": true}'
+data = json.loads(text)             # JSON -> Python
+print(data["name"])                 # Sam
+print(data["langs"][0])             # py
+print(json.dumps(data))             # back to a JSON string`}},
+{id:"py-nest-iter", cat:"Python Examples", title:"Nested data · Nested iteration",
+ desc:"Walk a 2-D structure with nested loops.",
+ code:{py:`matrix = [[1, 2, 3], [4, 5, 6]]
+for row in matrix:
+    for value in row:
+        print(value, end=" ")
+    print()`}},
+{id:"py-nest-copy", cat:"Python Examples", title:"Nested data · Deep vs. shallow copies",
+ desc:"A shallow copy shares inner objects; deepcopy duplicates everything.",
+ code:{py:`import copy
+a = [[1, 2], [3, 4]]
+shallow = a[:]                 # inner lists still shared
+shallow[0][0] = 99
+print(a)                       # [[99, 2], [3, 4]]  <- affected
+b = [[1, 2], [3, 4]]
+deep = copy.deepcopy(b)        # fully independent
+deep[0][0] = 99
+print(b)                       # [[1, 2], [3, 4]]  <- safe`}},
+
+{id:"py-test-assert", cat:"Python Examples", title:"Testing · Test cases (assert)",
+ desc:"assert raises AssertionError when an expectation is false.",
+ code:{py:`def double(x):
+    return x * 2
+assert double(2) == 4      # passes silently
+assert double(0) == 0
+print("all tests passed")`}},
+{id:"py-test-datatype", cat:"Python Examples", title:"Testing · Checking data-type assumptions",
+ desc:"Assert the result is the type you expect.",
+ code:{py:`def average(nums):
+    return sum(nums) / len(nums)
+result = average([2, 4, 6])
+assert isinstance(result, float)
+print(result)`}},
+{id:"py-test-other", cat:"Python Examples", title:"Testing · Checking other assumptions",
+ desc:"Assert invariants (ranges, bounds) hold.",
+ code:{py:`def clamp(x):
+    return max(0, min(100, x))
+assert clamp(150) == 100
+assert clamp(-5) == 0
+assert 0 <= clamp(37) <= 100       # invariant holds
+print("ok")`}},
+{id:"py-test-conditionals", cat:"Python Examples", title:"Testing · Testing conditionals",
+ desc:"Exercise every branch of an if/elif/else.",
+ code:{py:`def sign(n):
+    if n > 0: return "pos"
+    elif n < 0: return "neg"
+    else: return "zero"
+assert sign(5) == "pos"
+assert sign(-5) == "neg"
+assert sign(0) == "zero"
+print("branches covered")`}},
+{id:"py-test-loops", cat:"Python Examples", title:"Testing · Testing loops",
+ desc:"Test empty, none-match, and some-match inputs.",
+ code:{py:`def count_evens(nums):
+    c = 0
+    for n in nums:
+        if n % 2 == 0: c += 1
+    return c
+assert count_evens([]) == 0            # empty
+assert count_evens([1, 3]) == 0        # none
+assert count_evens([2, 4, 5]) == 2     # some
+print("loop tests passed")`}},
+{id:"py-test-return", cat:"Python Examples", title:"Testing · Return value tests",
+ desc:"Assert the returned value for several inputs.",
+ code:{py:`def add(a, b):
+    return a + b
+assert add(2, 3) == 5
+assert add(-1, 1) == 0
+assert add(0, 0) == 0
+print("return values verified")`}},
+{id:"py-test-sideeffect", cat:"Python Examples", title:"Testing · Side effect tests",
+ desc:"Verify a mutation actually happened.",
+ code:{py:`def append_zero(lst):
+    lst.append(0)
+data = [1, 2]
+append_zero(data)
+assert data == [1, 2, 0]
+print("side effect verified")`}},
+{id:"py-test-optional", cat:"Python Examples", title:"Testing · Testing optional parameters",
+ desc:"Test both the default and an overridden value.",
+ code:{py:`def greet(name, greeting="Hello"):
+    return f"{greeting}, {name}"
+assert greet("Sam") == "Hello, Sam"          # default
+assert greet("Sam", "Hi") == "Hi, Sam"       # override
+print("optional params verified")`}},
+
+{id:"py-exc-intro", cat:"Python Examples", title:"Exceptions · Exceptions",
+ desc:"An exception interrupts flow when something goes wrong.",
+ code:{py:`nums = [1, 2, 3]
+try:
+    print(nums[10])
+except IndexError:
+    print("that index doesn't exist")`}},
+{id:"py-exc-flow", cat:"Python Examples", title:"Exceptions · try/except flow of control",
+ desc:"try runs code; except handles errors; finally always runs.",
+ code:{py:`try:
+    x = int("not a number")
+    print("this line is skipped")
+except ValueError:
+    print("caught it")
+finally:
+    print("finally always runs")`}},
+{id:"py-exc-raise", cat:"Python Examples", title:"Exceptions · Raising and catching errors (raise)",
+ desc:"raise signals an error; the caller can catch it.",
+ code:{py:`def withdraw(balance, amount):
+    if amount > balance:
+        raise ValueError("insufficient funds")
+    return balance - amount
+try:
+    withdraw(50, 100)
+except ValueError as e:
+    print("error:", e)`}},
+{id:"py-exc-standard", cat:"Python Examples", title:"Exceptions · Standard exceptions",
+ desc:"Common built-in exception types by name.",
+ code:{py:`for call in ["1/0", "int('x')", "[][0]", "undefined_name"]:
+    try:
+        eval(call)
+    except Exception as e:
+        print(type(e).__name__, "->", e)
+# ZeroDivisionError, ValueError, IndexError, NameError`}},
+
+{id:"py-cls-define", cat:"Python Examples", title:"Classes · User-defined classes",
+ desc:"class defines a new type; () creates an instance.",
+ code:{py:`class Dog:
+    pass              # an empty class (a new type)
+d = Dog()             # create an instance
+print(type(d))        # <class '__main__.Dog'>`}},
+{id:"py-cls-init", cat:"Python Examples", title:"Classes · Constructor / parameters (init)",
+ desc:"__init__ runs at creation and sets instance attributes.",
+ code:{py:`class Point:
+    def __init__(self, x, y):   # runs when you create an instance
+        self.x = x
+        self.y = y
+p = Point(3, 4)
+print(p.x, p.y)                 # 3 4`}},
+{id:"py-cls-methods", cat:"Python Examples", title:"Classes · Adding methods",
+ desc:"Methods take self and act on the instance.",
+ code:{py:`class Circle:
+    def __init__(self, r):
+        self.r = r
+    def area(self):
+        return 3.14159 * self.r ** 2
+c = Circle(2)
+print(c.area())                 # 12.566...`}},
+{id:"py-cls-obj-args", cat:"Python Examples", title:"Classes · Objects as arguments/parameters",
+ desc:"Pass instances into functions like any other value.",
+ code:{py:`class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+def distance(a, b):
+    return ((a.x - b.x)**2 + (a.y - b.y)**2) ** 0.5
+print(distance(Point(0, 0), Point(3, 4)))   # 5.0`}},
+{id:"py-cls-str", cat:"Python Examples", title:"Classes · Converting an object to a string (str)",
+ desc:"__str__ controls how print() / str() show the object.",
+ code:{py:`class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+    def __str__(self):
+        return f"({self.x}, {self.y})"
+print(Point(3, 4))                     # (3, 4)`}},
+{id:"py-cls-return-instance", cat:"Python Examples", title:"Classes · Instances as return values",
+ desc:"A function can build and return a new object.",
+ code:{py:`class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+    def __str__(self):
+        return f"({self.x}, {self.y})"
+def midpoint(a, b):
+    return Point((a.x + b.x) / 2, (a.y + b.y) / 2)
+print(midpoint(Point(0, 0), Point(4, 6)))   # (2.0, 3.0)`}},
+{id:"py-cls-sort-instances", cat:"Python Examples", title:"Classes · Sorting lists of instances",
+ desc:"Sort objects with a key function on an attribute.",
+ code:{py:`class Person:
+    def __init__(self, name, age):
+        self.name, self.age = name, age
+    def __repr__(self):
+        return f"{self.name}({self.age})"
+people = [Person("Sam", 42), Person("Ana", 30)]
+print(sorted(people, key=lambda p: p.age))    # by age`}},
+{id:"py-cls-class-vs-instance", cat:"Python Examples", title:"Classes · Class variables vs. instance variables",
+ desc:"Class variables are shared; instance variables are per object.",
+ code:{py:`class Dog:
+    species = "Canis familiaris"     # class variable (shared)
+    def __init__(self, name):
+        self.name = name             # instance variable (per object)
+a, b = Dog("Rex"), Dog("Fido")
+print(a.species, b.species)          # shared value
+print(a.name, b.name)                # different`}},
+{id:"py-cls-private", cat:"Python Examples", title:"Classes · Public and private instance variables",
+ desc:"A leading underscore marks an attribute as internal (by convention).",
+ code:{py:`class Account:
+    def __init__(self, balance):
+        self.owner = "Sam"       # public by convention
+        self._balance = balance  # _leading underscore = internal
+    def deposit(self, amt):
+        self._balance += amt
+        return self._balance
+acct = Account(100)
+print(acct.deposit(50))          # 150`}},
+{id:"py-cls-test", cat:"Python Examples", title:"Classes · Testing classes",
+ desc:"Assert initial state, method returns, and state changes.",
+ code:{py:`class Counter:
+    def __init__(self):
+        self.n = 0
+    def bump(self):
+        self.n += 1
+        return self.n
+c = Counter()
+assert c.n == 0                  # initial state
+assert c.bump() == 1             # method return
+assert c.n == 1                  # state changed
+print("class tests passed")`}},
+{id:"py-cls-decorator", cat:"Python Examples", title:"Classes · Class decorators (property/staticmethod)",
+ desc:"@property exposes a method like an attribute; @staticmethod drops self.",
+ code:{py:`class Temp:
+    def __init__(self, c):
+        self._c = c
+    @property                     # access like an attribute, no ()
+    def fahrenheit(self):
+        return self._c * 9 / 5 + 32
+    @staticmethod                 # utility on the class, no self
+    def freezing():
+        return 0
+t = Temp(100)
+print(t.fahrenheit, Temp.freezing())   # 212.0 0`}},
+
+{id:"py-inh-intro", cat:"Python Examples", title:"Inheritance · Class inheritance",
+ desc:"A subclass gets the parent's methods for free.",
+ code:{py:`class Animal:
+    def breathe(self):
+        print("breathing")
+class Dog(Animal):        # Dog inherits from Animal
+    pass
+Dog().breathe()           # inherited method works`}},
+{id:"py-inh-subclass", cat:"Python Examples", title:"Inheritance · Defining a subclass",
+ desc:"A subclass extends the parent with its own state/behavior.",
+ code:{py:`class Shape:
+    def __init__(self, name):
+        self.name = name
+class Square(Shape):
+    def __init__(self, side):
+        super().__init__("square")
+        self.side = side
+s = Square(4)
+print(s.name, s.side)        # square 4`}},
+{id:"py-inh-lookup", cat:"Python Examples", title:"Inheritance · Attribute lookup order",
+ desc:"Python searches the instance, then the class, then its parents.",
+ code:{py:`class A:
+    x = "from A"
+class B(A):
+    pass
+b = B()
+print(b.x)         # 'from A'  (found on parent A)
+b.x = "on b"       # instance attribute shadows the class one
+print(b.x)         # 'on b'`}},
+{id:"py-inh-override", cat:"Python Examples", title:"Inheritance · Overriding methods",
+ desc:"A subclass can replace a parent method.",
+ code:{py:`class Animal:
+    def speak(self):
+        return "..."
+class Cat(Animal):
+    def speak(self):           # override
+        return "meow"
+print(Animal().speak(), Cat().speak())   # ... meow`}},
+{id:"py-inh-super", cat:"Python Examples", title:"Inheritance · Invoking the parent method (super)",
+ desc:"super() calls the parent's version of a method.",
+ code:{py:`class Logger:
+    def log(self, msg):
+        print("LOG:", msg)
+class TimeLogger(Logger):
+    def log(self, msg):
+        super().log(msg)           # call parent's version
+        print("  (also handled here)")
+TimeLogger().log("hi")`}},
+{id:"py-inh-multiple", cat:"Python Examples", title:"Inheritance · Multiple inheritance",
+ desc:"A class can inherit from more than one parent.",
+ code:{py:`class Swimmer:
+    def move(self): return "swim"
+class Flyer:
+    def fly(self): return "fly"
+class Duck(Swimmer, Flyer):        # inherits from both
+    pass
+d = Duck()
+print(d.move(), d.fly())           # swim fly`}},
+
+{id:"py-fp-map", cat:"Python Examples", title:"Functional · map",
+ desc:"Apply a function to every item, producing a new iterable.",
+ code:{py:`nums = [1, 2, 3, 4]
+squared = list(map(lambda x: x * x, nums))    # apply to each
+print(squared)                                 # [1, 4, 9, 16]
+print(list(map(str, nums)))                    # ['1','2','3','4']`}},
+{id:"py-fp-filter", cat:"Python Examples", title:"Functional · filter",
+ desc:"Keep only items for which the function returns True.",
+ code:{py:`nums = range(1, 11)
+evens = list(filter(lambda x: x % 2 == 0, nums))
+print(evens)                                     # [2, 4, 6, 8, 10]`}},
+{id:"py-fp-comprehension", cat:"Python Examples", title:"Functional · List comprehensions",
+ desc:"Build a list from an expression over an iterable, with an optional filter.",
+ code:{py:`print([x * x for x in range(5)])              # [0, 1, 4, 9, 16]
+print([x for x in range(10) if x % 2 == 0])   # evens
+print([c.upper() for c in "abc"])             # ['A', 'B', 'C']`}},
+{id:"py-fp-zip", cat:"Python Examples", title:"Functional · zip",
+ desc:"Pair up items from several iterables position by position.",
+ code:{py:`names = ["Sam", "Ana", "Kim"]
+ages = [42, 30, 25]
+for name, age in zip(names, ages):     # pair them up
+    print(name, age)
+print(dict(zip(names, ages)))          # {'Sam': 42, 'Ana': 30, 'Kim': 25}`}},
+
+/* ================= GOOGLE DORKS ================= */
+
+{id:"dork-inurl", cat:"Google Dorks", title:"inurl:", desc:"Require a term to appear in the page's URL — good for admin paths, login portals, and specific directories.",
+ code:{dork:`inurl:admin login portal`}},
+{id:"dork-site", cat:"Google Dorks", title:"site:", desc:"Limit results to a single domain or TLD.",
+ code:{dork:`site:microsoft.com windows xp end of life`}},
+{id:"dork-filetype", cat:"Google Dorks", title:"filetype: / ext:", desc:"Return only one file type. filetype: and ext: behave the same.",
+ code:{dork:`filetype:pdf nasa moon landing`}},
+{id:"dork-allinurl", cat:"Google Dorks", title:"allinurl:", desc:"Require every following word to appear in the URL (like stacking inurl:).",
+ code:{dork:`allinurl:blog wordpress admin`}},
+{id:"dork-intext", cat:"Google Dorks", title:"intext: / allintext:", desc:"Match words in the page body; allintext: requires all of the listed words.",
+ code:{dork:`intext:"index of /htdocs" patient records`}},
+{id:"dork-related", cat:"Google Dorks", title:"related:", desc:"Find sites similar to a given domain. Google's coverage of this operator is now limited.",
+ code:{dork:`related:sans.org`}},
+{id:"dork-info", cat:"Google Dorks", title:"info:", desc:"Once showed what Google indexed about a URL. Note: Google retired info: (~2019) and cache: (2024) — use the Wayback Machine (web.archive.org) for cached copies.",
+ code:{dork:`info:usgs.gov`}},
+{id:"dork-link", cat:"Google Dorks", title:"link:", desc:"Historically listed pages linking to a URL. Note: Google removed the link: operator (~2017); use Search Console or a backlink tool instead.",
+ code:{dork:`link:example.com/report.pdf`}},
+{id:"dork-exact", cat:"Google Dorks", title:`"exact phrase"`, desc:"Double quotes match a phrase verbatim and in order.",
+ code:{dork:`"malware hunting"`}},
+{id:"dork-plus", cat:"Google Dorks", title:"+word (force exact)", desc:"Force a term with no synonyms or stemming. Google removed the + operator in 2011 — quote the single word instead.",
+ code:{dork:`malware "hunter"`}},
+{id:"dork-exclude", cat:"Google Dorks", title:"-word (exclude)", desc:"A leading minus drops results (or query terms) containing that word. No space between - and the word.",
+ code:{dork:`advanced malware hunting -beginner -introduction`}},
+{id:"dork-wildcard", cat:"Google Dorks", title:`"word * word"`, desc:"Inside a quoted phrase, * is a single-word wildcard — matches anything between the two words.",
+ code:{dork:`"next * firewalls"`}},
+{id:"dork-or", cat:"Google Dorks", title:"OR / |", desc:"Match either term. Use uppercase OR or the pipe character | between terms.",
+ code:{dork:`locky OR ransomware`}},
+{id:"dork-and", cat:"Google Dorks", title:"AND", desc:"Match both terms. Google already ANDs separate words by default; explicit AND also works. The & character is not a Google operator.",
+ code:{dork:`cissp AND certification`}},
+{id:"dork-combo", cat:"Google Dorks", title:"Chaining operators (power search)", desc:"Stack operators for precise OSINT — e.g. surface exposed spreadsheets on a domain. Use only against systems you are authorized to assess.",
+ code:{dork:`intitle:"index of" (xls | xlsx) intext:budget site:example.com`}},
+
+/* ================= SQL ================= */
+
+/* ---------- querying a table ---------- */
+{id:"sql-select-cols", cat:"SQL", title:"SELECT columns", desc:"Return only the named columns from a table.",
+ code:{sql:`SELECT c1, c2 FROM t;`}},
+{id:"sql-select-all", cat:"SQL", title:"SELECT * (all columns)", desc:"Return every column and row; * means all columns.",
+ code:{sql:`SELECT * FROM t;`}},
+{id:"sql-where", cat:"SQL", title:"WHERE (filter rows)", desc:"Keep only rows that satisfy a condition.",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE condition;`}},
+{id:"sql-distinct", cat:"SQL", title:"SELECT DISTINCT", desc:"Drop duplicate rows from the result set.",
+ code:{sql:`SELECT DISTINCT c1 FROM t
+WHERE condition;`}},
+{id:"sql-orderby", cat:"SQL", title:"ORDER BY", desc:"Sort the result set; ASC is the default, DESC reverses it (per column).",
+ code:{sql:`SELECT c1, c2 FROM t
+ORDER BY c1 ASC;   -- or DESC`}},
+{id:"sql-limit", cat:"SQL", title:"LIMIT / OFFSET", desc:"Skip offset rows then return the next n. LIMIT/OFFSET is MySQL/PostgreSQL/SQLite; SQL Server & Oracle use OFFSET ... FETCH.",
+ code:{sql:`SELECT c1, c2 FROM t
+ORDER BY c1
+LIMIT n OFFSET offset;`}},
+{id:"sql-groupby", cat:"SQL", title:"GROUP BY (aggregate)", desc:"Collapse rows into groups and apply an aggregate (COUNT, SUM, ...) per group.",
+ code:{sql:`SELECT c1, aggregate(c2)
+FROM t
+GROUP BY c1;`}},
+{id:"sql-having", cat:"SQL", title:"HAVING (filter groups)", desc:"Filter groups after aggregation. WHERE filters rows; HAVING filters groups.",
+ code:{sql:`SELECT c1, aggregate(c2)
+FROM t
+GROUP BY c1
+HAVING condition;`}},
+
+/* ---------- joining tables ---------- */
+{id:"sql-inner-join", cat:"SQL", title:"INNER JOIN", desc:"Rows that have a match in both tables.",
+ code:{sql:`SELECT c1, c2
+FROM t1
+INNER JOIN t2 ON condition;`}},
+{id:"sql-left-join", cat:"SQL", title:"LEFT JOIN", desc:"All rows from the left table, plus matches from the right (NULLs where none).",
+ code:{sql:`SELECT c1, c2
+FROM t1
+LEFT JOIN t2 ON condition;`}},
+{id:"sql-right-join", cat:"SQL", title:"RIGHT JOIN", desc:"All rows from the right table, plus matches from the left.",
+ code:{sql:`SELECT c1, c2
+FROM t1
+RIGHT JOIN t2 ON condition;`}},
+{id:"sql-full-join", cat:"SQL", title:"FULL OUTER JOIN", desc:"All rows from both tables, matched where possible. Note: MySQL has no FULL OUTER JOIN — emulate with LEFT JOIN UNION RIGHT JOIN.",
+ code:{sql:`SELECT c1, c2
+FROM t1
+FULL OUTER JOIN t2 ON condition;`}},
+{id:"sql-cross-join", cat:"SQL", title:"CROSS JOIN", desc:"Cartesian product: every row of t1 paired with every row of t2.",
+ code:{sql:`SELECT c1, c2
+FROM t1
+CROSS JOIN t2;`}},
+{id:"sql-cross-join2", cat:"SQL", title:"Implicit cross join (comma)", desc:"Comma-separated tables also cross join; add a WHERE to turn it into an equi-join.",
+ code:{sql:`SELECT c1, c2
+FROM t1, t2;`}},
+{id:"sql-self-join", cat:"SQL", title:"Self join", desc:"Join a table to itself using two aliases (e.g. employee -> manager).",
+ code:{sql:`SELECT c1, c2
+FROM t1 A
+INNER JOIN t1 B ON condition;`}},
+
+/* ---------- set operators & predicates ---------- */
+{id:"sql-union", cat:"SQL", title:"UNION [ALL]", desc:"Stack rows of two queries (matching column count/types). UNION removes duplicates; UNION ALL keeps them.",
+ code:{sql:`SELECT c1, c2 FROM t1
+UNION [ALL]
+SELECT c1, c2 FROM t2;`}},
+{id:"sql-intersect", cat:"SQL", title:"INTERSECT", desc:"Rows present in both result sets.",
+ code:{sql:`SELECT c1, c2 FROM t1
+INTERSECT
+SELECT c1, c2 FROM t2;`}},
+{id:"sql-minus", cat:"SQL", title:"MINUS / EXCEPT", desc:"Rows in the first query but not the second. MINUS is Oracle; PostgreSQL/SQL Server/SQLite use EXCEPT.",
+ code:{sql:`SELECT c1, c2 FROM t1
+MINUS            -- EXCEPT in most databases
+SELECT c1, c2 FROM t2;`}},
+{id:"sql-like", cat:"SQL", title:"LIKE (pattern match)", desc:"Wildcard match: % = any run of characters, _ = exactly one character.",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE c1 LIKE 'a%';   -- starts with a ; use NOT LIKE to negate`}},
+{id:"sql-in", cat:"SQL", title:"IN (value list)", desc:"Match any value in a list (or a subquery).",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE c1 IN (1, 2, 3);   -- NOT IN to exclude`}},
+{id:"sql-between", cat:"SQL", title:"BETWEEN (range)", desc:"Match values in an inclusive range: low <= c1 <= high.",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE c1 BETWEEN low AND high;`}},
+{id:"sql-isnull", cat:"SQL", title:"IS [NOT] NULL", desc:"Test for NULL — you cannot compare to NULL with = (NULL = NULL is unknown).",
+ code:{sql:`SELECT c1, c2 FROM t
+WHERE c1 IS NULL;   -- or IS NOT NULL`}},
+
+/* ---------- managing tables ---------- */
+{id:"sql-create-table", cat:"SQL", title:"CREATE TABLE", desc:"Create a table with typed columns and inline column constraints.",
+ code:{sql:`CREATE TABLE t (
+  id    INT PRIMARY KEY,
+  name  VARCHAR NOT NULL,
+  price INT DEFAULT 0
+);`}},
+{id:"sql-drop-table", cat:"SQL", title:"DROP TABLE", desc:"Delete a table's data and structure from the database.",
+ danger:"Permanently removes the table and everything in it.",
+ code:{sql:`DROP TABLE t;`}},
+{id:"sql-truncate", cat:"SQL", title:"TRUNCATE TABLE", desc:"Remove all rows quickly, keeping the table structure.",
+ danger:"Deletes every row; usually cannot be rolled back and resets identity counters.",
+ code:{sql:`TRUNCATE TABLE t;`}},
+{id:"sql-add-column", cat:"SQL", title:"ALTER TABLE ADD column", desc:"Add a new column to an existing table.",
+ code:{sql:`ALTER TABLE t ADD column_name datatype;`}},
+{id:"sql-drop-column", cat:"SQL", title:"ALTER TABLE DROP COLUMN", desc:"Remove a column from a table.",
+ danger:"Permanently deletes the column and all data it holds.",
+ code:{sql:`ALTER TABLE t DROP COLUMN c;`}},
+{id:"sql-add-constraint", cat:"SQL", title:"ALTER TABLE ADD constraint", desc:"Attach a constraint (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK) to an existing table.",
+ code:{sql:`ALTER TABLE t ADD CONSTRAINT constraint_name constraint_definition;`}},
+{id:"sql-drop-constraint", cat:"SQL", title:"ALTER TABLE DROP constraint", desc:"Remove a named constraint from a table.",
+ code:{sql:`ALTER TABLE t DROP CONSTRAINT constraint_name;`}},
+{id:"sql-rename-table", cat:"SQL", title:"Rename a table", desc:"Rename table t1 to t2. (MySQL: RENAME TABLE t1 TO t2.)",
+ code:{sql:`ALTER TABLE t1 RENAME TO t2;`}},
+{id:"sql-rename-column", cat:"SQL", title:"Rename a column", desc:"Rename column c1 to c2. Some databases spell it ALTER TABLE t RENAME COLUMN c1 TO c2.",
+ code:{sql:`ALTER TABLE t1 RENAME c1 TO c2;`}},
+
+/* ---------- constraints ---------- */
+{id:"sql-primary-key", cat:"SQL", title:"PRIMARY KEY (composite)", desc:"Uniquely identify each row; a composite key spans several columns and implies NOT NULL.",
+ code:{sql:`CREATE TABLE t (
+  c1 INT,
+  c2 INT,
+  c3 VARCHAR,
+  PRIMARY KEY (c1, c2)
+);`}},
+{id:"sql-foreign-key", cat:"SQL", title:"FOREIGN KEY", desc:"Enforce referential integrity by pointing a column at another table's key.",
+ code:{sql:`CREATE TABLE t1 (
+  c1 INT PRIMARY KEY,
+  c2 INT,
+  FOREIGN KEY (c2) REFERENCES t2 (c2)
+);`}},
+{id:"sql-unique", cat:"SQL", title:"UNIQUE", desc:"Require the value (or combination of columns) to be unique across rows.",
+ code:{sql:`CREATE TABLE t (
+  c1 INT,
+  c2 INT,
+  UNIQUE (c2, c3)
+);`}},
+{id:"sql-check", cat:"SQL", title:"CHECK", desc:"Reject any row that fails a boolean condition.",
+ code:{sql:`CREATE TABLE t (
+  c1 INT,
+  c2 INT,
+  CHECK (c1 > 0 AND c1 >= c2)
+);`}},
+{id:"sql-not-null", cat:"SQL", title:"NOT NULL", desc:"Require a column to always hold a value.",
+ code:{sql:`CREATE TABLE t (
+  c1 INT PRIMARY KEY,
+  c2 VARCHAR NOT NULL
+);`}},
+
+/* ---------- modifying data ---------- */
+{id:"sql-insert-one", cat:"SQL", title:"INSERT one row", desc:"Add a single row to a table.",
+ code:{sql:`INSERT INTO t (column_list)
+VALUES (value_list);`}},
+{id:"sql-insert-many", cat:"SQL", title:"INSERT multiple rows", desc:"Add several rows in a single statement.",
+ code:{sql:`INSERT INTO t (column_list)
+VALUES
+  (value_list),
+  (value_list),
+  (value_list);`}},
+{id:"sql-insert-select", cat:"SQL", title:"INSERT ... SELECT", desc:"Insert rows produced by a query over another table.",
+ code:{sql:`INSERT INTO t1 (column_list)
+SELECT column_list
+FROM t2;`}},
+{id:"sql-update-where", cat:"SQL", title:"UPDATE (with WHERE)", desc:"Change columns only in rows that match the condition.",
+ code:{sql:`UPDATE t
+SET c1 = new_value,
+    c2 = new_value
+WHERE condition;`}},
+{id:"sql-update-all", cat:"SQL", title:"UPDATE all rows", desc:"Set a column for every row in the table.",
+ danger:"No WHERE clause — this changes every row.",
+ code:{sql:`UPDATE t
+SET c1 = new_value;`}},
+{id:"sql-delete-where", cat:"SQL", title:"DELETE (with WHERE)", desc:"Delete only the rows matching a condition.",
+ code:{sql:`DELETE FROM t
+WHERE condition;`}},
+{id:"sql-delete-all", cat:"SQL", title:"DELETE all rows", desc:"Delete every row while keeping the table structure.",
+ danger:"No WHERE clause — this empties the whole table.",
+ code:{sql:`DELETE FROM t;`}},
+
+/* ---------- views ---------- */
+{id:"sql-create-view", cat:"SQL", title:"CREATE VIEW", desc:"Save a query as a virtual table you can SELECT from.",
+ code:{sql:`CREATE VIEW v (c1, c2) AS
+SELECT c1, c2
+FROM t;`}},
+{id:"sql-view-check-option", cat:"SQL", title:"CREATE VIEW ... WITH CHECK OPTION", desc:"A view that rejects INSERT/UPDATE which would produce rows outside its WHERE clause.",
+ code:{sql:`CREATE VIEW v (c1, c2) AS
+SELECT c1, c2
+FROM t
+WITH [CASCADED | LOCAL] CHECK OPTION;`}},
+{id:"sql-recursive-view", cat:"SQL", title:"CREATE RECURSIVE VIEW", desc:"A view defined in terms of itself (anchor + recursive part). Most engines use a WITH RECURSIVE CTE instead.",
+ code:{sql:`CREATE RECURSIVE VIEW v AS
+  select_statement        -- anchor part
+UNION [ALL]
+  select_statement;       -- recursive part`}},
+{id:"sql-temp-view", cat:"SQL", title:"CREATE TEMPORARY VIEW", desc:"A view scoped to the current session; it disappears on disconnect.",
+ code:{sql:`CREATE TEMPORARY VIEW v AS
+SELECT c1, c2
+FROM t;`}},
+{id:"sql-drop-view", cat:"SQL", title:"DROP VIEW", desc:"Delete a view. The underlying table data is untouched.",
+ code:{sql:`DROP VIEW view_name;`}},
+
+/* ---------- indexes ---------- */
+{id:"sql-create-index", cat:"SQL", title:"CREATE INDEX", desc:"Speed up lookups/sorts on one or more columns (at the cost of slower writes).",
+ code:{sql:`CREATE INDEX idx_name
+ON t (c1, c2);`}},
+{id:"sql-unique-index", cat:"SQL", title:"CREATE UNIQUE INDEX", desc:"An index that also enforces uniqueness on the indexed columns.",
+ code:{sql:`CREATE UNIQUE INDEX idx_name
+ON t (c3, c4);`}},
+{id:"sql-drop-index", cat:"SQL", title:"DROP INDEX", desc:"Remove an index. Syntax varies (some need ON table).",
+ code:{sql:`DROP INDEX idx_name;`}},
+
+/* ---------- triggers & aggregates ---------- */
+{id:"sql-create-trigger", cat:"SQL", title:"CREATE TRIGGER", desc:"Run a stored procedure automatically on a table event. 'MODIFY' isn't standard — most engines use CREATE OR REPLACE / CREATE OR ALTER.",
+ code:{sql:`CREATE OR REPLACE TRIGGER trigger_name
+  { BEFORE | AFTER }             -- when
+  { INSERT | UPDATE | DELETE }   -- event
+  ON table_name
+  FOR EACH ROW                   -- or FOR EACH STATEMENT
+EXECUTE stored_procedure;`}},
+{id:"sql-trigger-example", cat:"SQL", title:"CREATE TRIGGER (example)", desc:"Fire a procedure before each new row is inserted into person.",
+ code:{sql:`CREATE TRIGGER before_insert_person
+BEFORE INSERT
+ON person FOR EACH ROW
+EXECUTE stored_procedure;`}},
+{id:"sql-drop-trigger", cat:"SQL", title:"DROP TRIGGER", desc:"Delete a trigger.",
+ code:{sql:`DROP TRIGGER trigger_name;`}},
+{id:"sql-aggregates", cat:"SQL", title:"Aggregate functions", desc:"AVG, COUNT, SUM, MIN, MAX summarize a set of rows — usually paired with GROUP BY.",
+ code:{sql:`SELECT
+  COUNT(*) AS row_count,
+  AVG(c2)  AS average,
+  SUM(c2)  AS total,
+  MIN(c2)  AS smallest,
+  MAX(c2)  AS largest
+FROM t;`}}
+];
