@@ -3032,5 +3032,270 @@ nmap -sV -p- {{TARGET:10.0.0.0/24}} -oA scan`
  url:"https://nmap.org/download.html", license:"open source (NPSL)",
  platforms:["windows","macos","linux"],
  tags:["network","recon"], attack:["T1046","T1595"],
- install:{cmd:"winget install Insecure.Nmap", mac:"brew install nmap", linux:"sudo apt install nmap"}}
+ install:{cmd:"winget install Insecure.Nmap", mac:"brew install nmap", linux:"sudo apt install nmap"}},
+
+/* ================= INCIDENT RESPONSE & LIVE TRIAGE ================= */
+{id:"ir-collect-triage", cat:"Incident Response & Live Triage", title:"Volatile-data snapshot bundle",
+ desc:"Capture system, network, process, and session state to a timestamped folder before it changes.",
+ danger:"Run elevated for full process/owner data. Writes a triage folder.",
+ team:"blue", tags:["incident-response","triage"],
+ code:{
+  ps:`$o = "triage_" + $env:COMPUTERNAME + "_" + (Get-Date -f yyyyMMdd_HHmmss); New-Item -Type Directory $o | Out-Null
+systeminfo            > "$o/sysinfo.txt"
+ipconfig /all         > "$o/ipconfig.txt"
+Get-NetTCPConnection  | Out-File "$o/connections.txt"
+Get-Process           | Out-File "$o/processes.txt"
+query user 2>$null    > "$o/sessions.txt"
+arp -a                > "$o/arp.txt"
+"Collected to $o"`,
+  linux:`o="triage_$(hostname)_$(date +%Y%m%d_%H%M%S)"; mkdir -p "$o"
+uname -a > "$o/uname.txt"; ip a > "$o/ip.txt"; ip route > "$o/routes.txt"
+ss -tunap > "$o/connections.txt" 2>/dev/null; ps auxww > "$o/processes.txt"
+who -a > "$o/sessions.txt"; ip neigh > "$o/arp.txt" 2>/dev/null
+echo "Collected to $o"`,
+  mac:`o="triage_$(hostname)_$(date +%Y%m%d_%H%M%S)"; mkdir -p "$o"
+uname -a > "$o/uname.txt"; ifconfig > "$o/ifconfig.txt"; netstat -rn > "$o/routes.txt"
+sudo lsof -nP -iTCP -sTCP:ESTABLISHED > "$o/connections.txt" 2>/dev/null
+ps auxww > "$o/processes.txt"; who -a > "$o/sessions.txt"; arp -an > "$o/arp.txt"
+echo "Collected to $o"`
+ }},
+{id:"ir-proc-suspicious", cat:"Incident Response & Live Triage", title:"Processes from suspicious paths",
+ desc:"Flag running processes whose image lives in a user-writable/temp location (dropper indicator).",
+ team:"blue", tags:["incident-response","triage","process"], attack:["T1036"],
+ code:{
+  ps:`Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -match 'Temp|AppData|ProgramData|Public' } |
+  Select-Object ProcessId, Name, ExecutablePath, CommandLine`,
+  linux:`# binaries deleted-after-exec or run from a temp dir:
+ls -l /proc/*/exe 2>/dev/null | grep -E 'deleted|/tmp/|/dev/shm/|/var/tmp/'`,
+  mac:`ps -axo pid,comm | grep -Ei '/tmp/|/users/shared/|/private/tmp/'`
+ }},
+{id:"ir-proc-hash", cat:"Incident Response & Live Triage", title:"Hash running-process images",
+ desc:"SHA-256 every running executable to match against IOC / known-bad hash lists.",
+ danger:"Run elevated to reach every process image.",
+ team:"blue", tags:["incident-response","triage","process"],
+ code:{
+  ps:`Get-Process | Where-Object Path | Select-Object -Unique Path |
+  ForEach-Object { [pscustomobject]@{ SHA256=(Get-FileHash $_.Path -Algorithm SHA256).Hash; Path=$_.Path } }`,
+  linux:`for p in /proc/[0-9]*/exe; do t=$(readlink -f "$p" 2>/dev/null); [ -f "$t" ] && printf "%s  %s\\n" "$(sha256sum "$t" | cut -d' ' -f1)" "$t"; done | sort -u`,
+  mac:`ps -axo comm= | sort -u | while read b; do [ -f "$b" ] && shasum -a 256 "$b"; done`
+ }},
+{id:"ir-proc-netmap", cat:"Incident Response & Live Triage", title:"Connections mapped to processes",
+ desc:"Established sessions with the owning PID, process name, and (where available) command line.",
+ team:"blue", tags:["incident-response","triage","network"],
+ code:{
+  ps:`Get-NetTCPConnection -State Established | ForEach-Object {
+  $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+  [pscustomobject]@{ Remote="$($_.RemoteAddress):$($_.RemotePort)"; PID=$_.OwningProcess; Proc=$p.ProcessName; Path=$p.Path }
+}`,
+  linux:`ss -tunap state established`,
+  mac:`sudo lsof -nP -iTCP -sTCP:ESTABLISHED`
+ }},
+{id:"ir-persistence-sweep", cat:"Incident Response & Live Triage", title:"Persistence sweep",
+ desc:"One pass over the common autostart locations (run keys/services/tasks, or cron/systemd/launchd).",
+ danger:"Run elevated to cover all users/system scope.",
+ team:"blue", tags:["incident-response","persistence","triage"], attack:["T1547"],
+ code:{
+  ps:`"== Run keys =="
+Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run','HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue
+"== Auto services outside Windows dir =="
+Get-CimInstance Win32_Service | Where-Object { $_.StartMode -eq 'Auto' -and $_.PathName -notmatch 'Windows' } | Select-Object Name, PathName
+"== Non-Microsoft scheduled tasks =="
+Get-ScheduledTask | Where-Object { $_.TaskPath -notmatch 'Microsoft' } | Select-Object TaskPath, TaskName, State`,
+  linux:`echo "== cron =="; crontab -l 2>/dev/null; ls -la /etc/cron.* /etc/crontab 2>/dev/null
+echo "== systemd enabled =="; systemctl list-unit-files --state=enabled --no-pager
+echo "== rc.local / profile.d =="; ls -la /etc/rc.local /etc/profile.d/ 2>/dev/null`,
+  mac:`echo "== LaunchAgents/Daemons =="; ls -la ~/Library/LaunchAgents /Library/LaunchAgents /Library/LaunchDaemons 2>/dev/null
+echo "== login items =="; osascript -e 'tell application "System Events" to get the name of every login item' 2>/dev/null
+echo "== cron =="; crontab -l 2>/dev/null`
+ }},
+{id:"ir-new-accounts", cat:"Incident Response & Live Triage", title:"New / privileged accounts",
+ desc:"Surface recently created accounts and current admin/sudo membership.",
+ danger:"Run elevated.",
+ team:"blue", tags:["incident-response","account","triage"], attack:["T1136"],
+ code:{
+  ps:`Get-LocalUser | Sort-Object PasswordLastSet -Descending | Select-Object Name, Enabled, PasswordLastSet, LastLogon
+"== Administrators =="; Get-LocalGroupMember Administrators | Select-Object Name, PrincipalSource`,
+  linux:`sort -t: -k3 -n /etc/passwd | tail -8
+echo "== sudo/wheel =="; getent group sudo wheel 2>/dev/null
+echo "== passwd/shadow mtime =="; stat -c '%y %n' /etc/passwd /etc/shadow 2>/dev/null`,
+  mac:`dscl . -list /Users | grep -v '^_'
+echo "== admin group =="; dscl . -read /Groups/admin GroupMembership`
+ }},
+{id:"ir-recent-exe", cat:"Incident Response & Live Triage", title:"Recently written executables",
+ desc:"Executables/scripts dropped into system or temp dirs in the last few days.",
+ danger:"Run elevated.",
+ team:"blue", tags:["incident-response","triage","persistence"], attack:["T1105"],
+ code:{
+  ps:`Get-ChildItem C:\\Windows\\Temp, $env:TEMP, C:\\ProgramData -Include *.exe,*.dll,*.ps1,*.bat -Recurse -ErrorAction SilentlyContinue |
+  Where-Object LastWriteTime -gt (Get-Date).AddDays(-3) | Select-Object FullName, LastWriteTime, Length | Sort-Object LastWriteTime -Descending`,
+  linux:`find /tmp /var/tmp /dev/shm /home -type f -mtime -3 \\( -perm -u+x -o -name '*.sh' -o -name '*.py' \\) 2>/dev/null -printf '%TY-%Tm-%Td %p\\n' | sort`,
+  mac:`find /tmp /var/tmp /Users -type f -mtime -3 \\( -perm -u+x -o -name '*.sh' -o -name '*.py' \\) 2>/dev/null -exec stat -f '%Sm %N' {} + | sort`
+ }},
+{id:"ir-ioc-hash", cat:"Incident Response & Live Triage", title:"Hunt a known-bad hash",
+ desc:"Search a path for any file matching a known-bad SHA-256.",
+ team:"blue", tags:["incident-response","forensics"],
+ code:{
+  ps:`$bad = "{{SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}}"
+Get-ChildItem {{PATH:C:/Users}} -Recurse -File -ErrorAction SilentlyContinue |
+  Where-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash -eq $bad } | Select-Object FullName`,
+  linux:`BAD={{SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}}
+find {{PATH:/home}} -type f 2>/dev/null -exec sha256sum {} + | awk -v b="$BAD" 'tolower($1)==tolower(b){print $2}'`,
+  mac:`BAD={{SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}}
+find {{PATH:/Users}} -type f 2>/dev/null -exec shasum -a 256 {} + | awk -v b="$BAD" 'tolower($1)==tolower(b){print $2}'`
+ }},
+{id:"ir-ioc-ip", cat:"Incident Response & Live Triage", title:"Hunt a known-bad IP",
+ desc:"Check live connections, DNS cache, and logs for a suspect IP address.",
+ team:"blue", tags:["incident-response","network"],
+ code:{
+  ps:`$ip="{{IP:203.0.113.10}}"
+Get-NetTCPConnection | Where-Object RemoteAddress -eq $ip | Select-Object LocalPort, RemoteAddress, RemotePort, OwningProcess
+Get-DnsClientCache | Where-Object Data -eq $ip`,
+  linux:`IP={{IP:203.0.113.10}}
+ss -tunap | grep "$IP"; echo "-- logs --"; grep -R "$IP" /var/log 2>/dev/null | tail`,
+  mac:`IP={{IP:203.0.113.10}}
+sudo lsof -nP -iTCP | grep "$IP"; netstat -an | grep "$IP"`
+ }},
+{id:"ir-logon-anomalies", cat:"Incident Response & Live Triage", title:"Recent network / RDP logons",
+ desc:"Successful logons in the last day filtered to remote types (network/RDP) with source.",
+ danger:"Requires administrator / root to read the security/auth logs.",
+ team:"blue", tags:["incident-response","logs","account"], attack:["T1078"],
+ code:{
+  ps:`Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624; StartTime=(Get-Date).AddHours(-24)} -MaxEvents 100 |
+  ForEach-Object { [pscustomobject]@{ Time=$_.TimeCreated; User=$_.Properties[5].Value; Type=$_.Properties[8].Value; Src=$_.Properties[18].Value } } |
+  Where-Object { $_.Type -in 3,10 }`,
+  linux:`last -20
+echo "-- auth --"; sudo grep -Ei 'accepted|failed password' /var/log/auth.log /var/log/secure 2>/dev/null | tail -20`,
+  mac:`last -20
+log show --last 24h --predicate 'eventMessage CONTAINS[c] "authentication"' 2>/dev/null | tail -20`
+ }},
+{id:"ir-svc-new", cat:"Incident Response & Live Triage", title:"Newly installed services",
+ desc:"Service-install events (a common persistence step). Windows event 7045; recent systemd/launchd units.",
+ danger:"Requires administrator / root.",
+ team:"blue", tags:["incident-response","persistence","logs"], attack:["T1543.003"],
+ code:{
+  ps:`Get-WinEvent -FilterHashtable @{LogName='System'; Id=7045} -MaxEvents 20 |
+  Select-Object TimeCreated, @{n='Service';e={$_.Properties[0].Value}}, @{n='Image';e={$_.Properties[1].Value}}`,
+  linux:`ls -lt /etc/systemd/system/*.service /lib/systemd/system/*.service 2>/dev/null | head`,
+  mac:`ls -lt /Library/LaunchDaemons /Library/LaunchAgents ~/Library/LaunchAgents 2>/dev/null | head -20`
+ }},
+{id:"ir-logclear", cat:"Incident Response & Live Triage", title:"Log-clearing / tampering signs",
+ desc:"Detect audit-log-cleared events (Windows 1102) or gaps/truncation in Unix auth logs.",
+ danger:"Requires administrator / root.",
+ team:"blue", tags:["incident-response","logs"], attack:["T1070.001"],
+ code:{
+  ps:`Get-WinEvent -FilterHashtable @{LogName='Security'; Id=1102} -MaxEvents 10 |
+  Select-Object TimeCreated, @{n='ClearedBy';e={$_.Properties[1].Value}}`,
+  linux:`ls -la /var/log/auth.log /var/log/secure /var/log/wtmp /var/log/btmp 2>/dev/null
+echo "-- journal --"; journalctl --disk-usage 2>/dev/null`,
+  mac:`ls -la /var/log/*.log /private/var/log/ 2>/dev/null | head`
+ }},
+{id:"ir-open-files", cat:"Incident Response & Live Triage", title:"Open files / handles of a process",
+ desc:"What a suspect process has open. Windows needs Sysinternals handle.exe; lsof on mac/linux.",
+ danger:"Run elevated.",
+ team:"blue", tags:["incident-response","triage","process"],
+ code:{
+  ps:`# Sysinternals handle.exe (dependency):
+handle.exe -p {{PID:1234}}`,
+  linux:`sudo lsof -p {{PID:1234}}`,
+  mac:`sudo lsof -p {{PID:1234}}`
+ }},
+{id:"ir-loaded-modules", cat:"Incident Response & Live Triage", title:"Loaded modules of a process",
+ desc:"DLLs / shared libraries a process has loaded — helps spot injected or unusual modules.",
+ danger:"Run elevated.",
+ team:"blue", tags:["incident-response","triage","process"], attack:["T1055"],
+ code:{
+  ps:`Get-Process -Id {{PID:1234}} | Select-Object -ExpandProperty Modules | Select-Object ModuleName, FileName | Sort-Object ModuleName`,
+  linux:`sudo cat /proc/{{PID:1234}}/maps | awk '{print $6}' | grep -E '[.]so' | sort -u`,
+  mac:`sudo lsof -p {{PID:1234}} | grep -E 'dylib'`
+ }},
+{id:"ir-wmi-persistence", cat:"Incident Response & Live Triage", title:"WMI event-subscription persistence",
+ desc:"List permanent WMI event subscriptions — a stealthy Windows persistence mechanism.",
+ danger:"Requires administrator.",
+ team:"blue", tags:["incident-response","persistence"], attack:["T1546.003"],
+ code:{
+  ps:`Get-WmiObject -Namespace root/subscription -Class __EventFilter | Select-Object Name, Query
+Get-WmiObject -Namespace root/subscription -Class CommandLineEventConsumer | Select-Object Name, CommandLineTemplate
+Get-WmiObject -Namespace root/subscription -Class __FilterToConsumerBinding | Select-Object Filter, Consumer`
+ }},
+{id:"ir-hosts-file", cat:"Incident Response & Live Triage", title:"Inspect the hosts file",
+ desc:"Check for malicious static DNS overrides in the hosts file.",
+ team:"blue", tags:["incident-response","network","quick-win"],
+ code:{
+  ps:`Get-Content C:/Windows/System32/drivers/etc/hosts | Where-Object { $_.Trim() -and -not $_.Trim().StartsWith('#') }`,
+  cmd:`type C:\\Windows\\System32\\drivers\\etc\\hosts | findstr /v "^#"`,
+  linux:`grep -vE '^[[:space:]]*(#|$)' /etc/hosts`,
+  mac:`grep -vE '^[[:space:]]*(#|$)' /etc/hosts`
+ }},
+{id:"ir-scheduled-recent", cat:"Incident Response & Live Triage", title:"Recently created scheduled tasks",
+ desc:"Scheduled tasks / cron / timers by most-recent write — catches freshly planted persistence.",
+ danger:"Run elevated.",
+ team:"blue", tags:["incident-response","persistence","scheduling"], attack:["T1053.005"],
+ code:{
+  ps:`Get-ChildItem C:/Windows/System32/Tasks -Recurse -File -ErrorAction SilentlyContinue |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 15 FullName, LastWriteTime`,
+  linux:`ls -lt /etc/cron.d /var/spool/cron/crontabs /etc/systemd/system/*.timer 2>/dev/null | head -20`,
+  mac:`ls -lt /Library/LaunchDaemons ~/Library/LaunchAgents 2>/dev/null | head; crontab -l 2>/dev/null`
+ }},
+{id:"ir-pcap", cat:"Incident Response & Live Triage", title:"Quick packet capture",
+ desc:"Capture traffic for a host to a file for later analysis. tcpdump (mac/linux); netsh trace (Windows).",
+ danger:"Captures traffic to a file; run elevated. Authorized monitoring only.",
+ team:"blue", tags:["incident-response","network"],
+ code:{
+  ps:`netsh trace start capture=yes tracefile=C:/capture.etl
+Write-Host "Reproduce the activity, then: netsh trace stop"`,
+  linux:`sudo tcpdump -i {{IFACE:eth0}} -w "capture_$(date +%H%M%S).pcap" host {{IP:10.0.0.5}}`,
+  mac:`sudo tcpdump -i {{IFACE:en0}} -w "capture_$(date +%H%M%S).pcap" host {{IP:10.0.0.5}}`
+ }},
+{id:"ir-memory-acquire", cat:"Incident Response & Live Triage", title:"Acquire RAM",
+ desc:"Dump physical memory for offline analysis. Needs a trusted forensic build (WinPmem / AVML / OSXPmem).",
+ danger:"Needs admin/root; writes a very large file. Use a trusted, verified acquisition binary.",
+ team:"blue", tags:["incident-response","memory","forensics"],
+ code:{
+  ps:`# WinPmem (Velocidex) — download the signed binary first:
+./winpmem.exe -o C:/mem.raw`,
+  linux:`sudo avml /tmp/mem.lime      # Microsoft AVML`,
+  mac:`sudo osxpmem.app/osxpmem -o /tmp/mem.aff4`
+ }},
+{id:"ir-isolate-host", cat:"Incident Response & Live Triage", title:"Network isolation (containment)",
+ desc:"Cut a host off the network except a management subnet, to contain an active compromise.",
+ danger:"CONTAINMENT — will drop the host's network (you may lose your own remote session). Authorized IR only; run elevated.",
+ team:"blue", tags:["incident-response","containment","network"],
+ code:{
+  ps:`New-NetFirewallRule -DisplayName "IR-Block-Out" -Direction Outbound -Action Block -RemoteAddress Any
+New-NetFirewallRule -DisplayName "IR-Allow-Mgmt" -Direction Outbound -Action Allow -RemoteAddress {{MGMT:10.0.0.0/24}}`,
+  linux:`sudo nft add table inet ir 2>/dev/null
+sudo nft 'add chain inet ir out { type filter hook output priority 0; policy drop; }'
+sudo nft add rule inet ir out ip daddr {{MGMT:10.0.0.0/24}} accept`,
+  mac:`printf 'block all\\npass out to {{MGMT:10.0.0.0/24}}\\n' | sudo pfctl -ef -`
+ }},
+{id:"ir-kill-by-conn", cat:"Incident Response & Live Triage", title:"Kill processes talking to an IP",
+ desc:"Find and terminate the process(es) with a connection to a suspect address.",
+ danger:"Force-terminates processes — unsaved data is lost. Confirm before running; needs elevation.",
+ team:"blue", tags:["incident-response","containment","process"],
+ code:{
+  ps:`$ip="{{IP:203.0.113.10}}"
+Get-NetTCPConnection -RemoteAddress $ip | Select-Object -Expand OwningProcess -Unique |
+  ForEach-Object { Get-Process -Id $_ | Select-Object Name, Id; Stop-Process -Id $_ -Force }`,
+  linux:`IP={{IP:203.0.113.10}}
+sudo ss -tunp | grep "$IP"   # note the pid=NNNN, then: sudo kill -9 <PID>`,
+  mac:`IP={{IP:203.0.113.10}}
+sudo lsof -nP -iTCP | grep "$IP"   # note the PID, then: sudo kill -9 <PID>`
+ }},
+{id:"ir-timeline", cat:"Incident Response & Live Triage", title:"File MACB timeline",
+ desc:"List files under a path sorted by time to reconstruct activity around an incident.",
+ team:"blue", tags:["incident-response","forensics","timeline"],
+ code:{
+  ps:`Get-ChildItem {{PATH:C:/inetpub}} -Recurse -File -ErrorAction SilentlyContinue |
+  Sort-Object LastWriteTime | Select-Object LastWriteTime, CreationTime, FullName`,
+  linux:`find {{PATH:/var/www}} -type f -printf '%TY-%Tm-%Td %TH:%TM  %p\\n' 2>/dev/null | sort`,
+  mac:`find {{PATH:/var/www}} -type f -exec stat -f '%Sm %N' {} + 2>/dev/null | sort`
+ }},
+{id:"ir-clipboard", cat:"Incident Response & Live Triage", title:"Capture the clipboard",
+ desc:"Grab current clipboard contents — a volatile artifact worth collecting early.",
+ team:"blue", tags:["incident-response","triage","quick-win"],
+ code:{
+  ps:`Get-Clipboard`,
+  mac:`pbpaste`,
+  linux:`xclip -selection clipboard -o 2>/dev/null || wl-paste 2>/dev/null`
+ }}
 ];

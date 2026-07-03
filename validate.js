@@ -28,6 +28,7 @@ const ALLOWED_TAGS = new Set([
   "containers","cloud","git","regex","quick-win","windows","macos","linux",
   "cross-platform","teaching","reference",
   "dns","smb","snmp","discovery","scanning","subdomain","banner","mail",
+  "persistence","memory","containment","timeline","process","account",
 ]);
 
 const errors = [];
