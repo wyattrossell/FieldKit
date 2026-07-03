@@ -1,0 +1,7 @@
+# Keep GitHub source downloads (Code > Download ZIP, release tarballs) to only
+# the files needed to RUN FieldKit. Everything is export-ignored, then the two
+# runtime files are re-included. Dev/meta files stay in the repo for
+# contributors but never ship in a download. (git archive honors these.)
+* export-ignore
+/FieldKit.html   -export-ignore
+/library-data.js -export-ignore
