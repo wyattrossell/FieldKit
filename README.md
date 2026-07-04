@@ -12,8 +12,13 @@ red teams, educators, and IT / forensics practitioners. Runs straight from a USB
 > **Authorized use & education only. You are responsible for legal compliance.**
 > See [DISCLAIMER.md](DISCLAIMER.md).
 
-<!-- Screenshot: drop an image at docs/screenshot.png and it will render here -->
-<!-- ![FieldKit](docs/screenshot.png) -->
+## What it looks like
+
+![FieldKit — search, category rail, and a command entry with placeholders, ATT&CK/Detect/Mitigate, and related next-steps](docs/screenshot.png)
+
+*Left: category rail grouped into domains. Middle: live-filtered results. Right: the selected
+command with fill-in placeholders, team + MITRE ATT&CK badges, Detect/Mitigate, and related
+next-steps. (Shown in the High-Contrast theme; try the [live demo](https://wyattrossell.github.io/FieldKit/).)*
 
 ## What it does
 
