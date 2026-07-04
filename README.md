@@ -1,8 +1,13 @@
 # FieldKit
 
+### ▶ [Live demo](https://wyattrossell.github.io/FieldKit/) · [Download single file](https://github.com/wyattrossell/FieldKit/releases)
+
 **An offline, single-file command reference and purple-team learning tool** for blue teams,
 red teams, educators, and IT / forensics practitioners. Runs straight from a USB drive — open
 `FieldKit.html` in any browser (`file://`), no install, no build, no network.
+
+> **Trust:** a single, auditable HTML file — **zero network calls, no telemetry, no external
+> dependencies**, works fully air-gapped from `file://`. The hosted demo is the same file.
 
 > **Authorized use & education only. You are responsible for legal compliance.**
 > See [DISCLAIMER.md](DISCLAIMER.md).
