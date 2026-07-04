@@ -406,10 +406,13 @@
   </select>
   <button class="toolbtn" id="runbookBtn" title="Build ordered runbooks and export them as a script">▶ Runbooks</button>
   <button class="toolbtn" id="addBtn">+ Add</button>
-  <button class="toolbtn" id="saveFileBtn" title="Save your custom commands to a JSON file on the USB stick. After linking, new additions auto-save to it.">Save file</button>
-  <button class="toolbtn" id="loadFileBtn" title="Load custom commands from a JSON file — e.g. after plugging the USB into another PC.">Load file</button>
-  <button class="toolbtn" id="exportBtn" title="Download the whole library as JSON">Export</button>
-  <button class="toolbtn" id="importBtn" title="Import a library JSON file">Import</button>
+  <select class="toolbtn" id="dataMenu" title="Save / load / import / export your data">
+    <option value="" id="dataMenuLabel">Data ▾</option>
+    <option value="save" id="dataSaveOpt">Save file (USB)</option>
+    <option value="load">Load file</option>
+    <option value="export">Export library (JSON)</option>
+    <option value="import">Import library (JSON)</option>
+  </select>
   <input type="file" id="importFile" accept="application/json" style="display:none">
 </header>
 
@@ -442,7 +445,7 @@
 <div class="scrim" id="scrim">
   <div class="modal">
     <h3 id="m-heading">Add a snippet</h3>
-    <p class="sub">Auto-saved on this computer. Use <b>Save file</b> to keep them on the USB stick so they travel to other PCs (<b>Load file</b> there).</p>
+    <p class="sub">Auto-saved on this computer. Use <b>Data ▾ → Save file</b> to keep them on the USB stick so they travel to other PCs (<b>Load file</b> there).</p>
     <div class="field"><label>Task name</label><input id="m-title" placeholder="Reset a stuck print spooler"></div>
     <div class="field"><label>Category</label><input id="m-cat" list="catlist" placeholder="Maintenance"><datalist id="catlist"></datalist></div>
     <div class="field"><label>Description</label><input id="m-desc" placeholder="Short line describing what it does"></div>
@@ -1209,10 +1212,13 @@ $("#m-delete").onclick=()=>{
   }
   persistAll();
 };
-$("#exportBtn").onclick=()=>{
-  download("fieldkit-library.json", JSON.stringify(library,null,2));
+$("#dataMenu").onchange=e=>{
+  const v=e.target.value; e.target.value="";   // run the action, then snap back to the "Data ▾" label
+  if(v==="save") saveToFile();
+  else if(v==="load") loadFromFile();
+  else if(v==="export") download("fieldkit-library.json", JSON.stringify(library,null,2));
+  else if(v==="import") $("#importFile").click();
 };
-$("#importBtn").onclick=()=>$("#importFile").click();
 $("#importFile").onchange=e=>{
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
@@ -1280,8 +1286,9 @@ const LS_KEY = "fieldkit.customs.v1";
 let fileHandle = null;                                   // linked JSON file on the drive (if any)
 const FSA = ("showOpenFilePicker" in window) && ("showSaveFilePicker" in window);
 let pendingHandle = null;                                // handle awaiting a one-click re-grant
-let baseSaveLabel = "Save file";
-function setBaseLabel(t){ baseSaveLabel = t; const b = $("#saveFileBtn"); if(b) b.textContent = t; }
+let baseSaveLabel = "Save file (USB)";
+function dataLabel(){ return baseSaveLabel === "Reconnect USB" ? "⚠ Reconnect USB ▾" : "Data ▾"; }
+function setBaseLabel(t){ baseSaveLabel = t; const o = $("#dataSaveOpt"); if(o) o.textContent = (t === "Save file" ? "Save file (USB)" : t); const l = $("#dataMenuLabel"); if(l) l.textContent = dataLabel(); }
 async function loadHandleData(h){
   try { mergeCustoms(JSON.parse(await (await h.getFile()).text())); persistLocal(); renderRail(); renderList(); }
   catch(e){}
@@ -1339,9 +1346,9 @@ async function writeLinkedFile(){
   }catch(e){ setSync("Save failed"); }
 }
 function setSync(msg){
-  const b = $("#saveFileBtn"); if(!b) return;
-  b.textContent = msg;
-  setTimeout(() => { b.textContent = baseSaveLabel; }, 1800);
+  const l = $("#dataMenuLabel"); if(!l) return;
+  l.textContent = msg;
+  setTimeout(() => { l.textContent = dataLabel(); }, 1800);
 }
 async function saveToFile(){
   // if a previously-linked file is waiting on a one-click re-grant, do that first
@@ -1394,8 +1401,7 @@ async function tryReconnectFile(){
   }catch(e){}
 }
 
-$("#saveFileBtn").onclick = saveToFile;
-$("#loadFileBtn").onclick = loadFromFile;
+/* (Save / Load / Export / Import are dispatched from the #dataMenu dropdown) */
 
 /* ---------- keyboard nav ---------- */
 document.addEventListener("keydown", e=>{
