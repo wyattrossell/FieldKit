@@ -221,9 +221,41 @@
   .sess-newvar:focus{border-color:var(--amber-dim); outline:none}
   .sess-clear{font-family:var(--mono); font-size:10.5px; color:var(--faint); background:transparent; border:1px solid var(--edge); border-radius:5px; padding:4px 9px; cursor:pointer}
   .sess-clear:hover{color:var(--amber); border-color:var(--amber-dim)}
-  .reportrow{margin-top:12px}
+  .reportrow{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center}
   .report{font-family:var(--mono); font-size:10.5px; color:var(--faint); text-decoration:none; border:1px solid var(--edge); border-radius:5px; padding:3px 9px}
   .report:hover{color:var(--amber); border-color:var(--amber-dim)}
+  .rb-add{font-family:var(--mono); font-size:10.5px; color:var(--teal); background:transparent; border:1px solid var(--edge); border-radius:5px; padding:3px 9px; cursor:pointer}
+  .rb-add:hover{color:var(--ink); border-color:var(--teal)}
+  .rb-add.ok{color:var(--green); border-color:#3a5c33}
+  /* runbook modal */
+  .rbmodal{width:min(700px,100%)}
+  .rb-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px}
+  .rb-head h3{margin:0}
+  .rb-toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:14px 0}
+  .rb-toolbar select{background:var(--bg); border:1px solid var(--edge); border-radius:6px; color:var(--ink); font-family:var(--mono); font-size:12.5px; padding:7px 9px; min-width:180px}
+  .rb-mini{font-family:var(--mono); font-size:11px; color:var(--muted); background:var(--bg); border:1px solid var(--edge); border-radius:6px; padding:6px 10px; cursor:pointer}
+  .rb-mini:hover{color:var(--ink); border-color:var(--edge2)}
+  .rb-mini.danger:hover{color:var(--red); border-color:#7a3a2c}
+  .rb-steps{list-style:none; margin:0; padding:0; max-height:42vh; overflow-y:auto; border:1px solid var(--edge); border-radius:8px}
+  .rb-step{display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid var(--edge)}
+  .rb-step:last-child{border-bottom:0}
+  .rb-step .num{font-family:var(--mono); font-size:11px; color:var(--faint); width:20px; flex:none; text-align:right}
+  .rb-step .info{flex:1; min-width:0}
+  .rb-step .st-title{font-size:13px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .rb-step .st-cat{font-family:var(--mono); font-size:10px; color:var(--faint)}
+  .rb-step .st-langs{font-family:var(--mono); font-size:9px; color:var(--muted); margin-left:6px}
+  .rb-step .st-btns{display:flex; gap:4px; flex:none}
+  .rb-sbtn{font-family:var(--mono); font-size:12px; color:var(--muted); background:var(--bg); border:1px solid var(--edge); border-radius:5px; width:26px; height:26px; cursor:pointer; line-height:1}
+  .rb-sbtn:hover{color:var(--ink); border-color:var(--edge2)}
+  .rb-sbtn:disabled{opacity:.3; cursor:default}
+  .rb-sbtn.rm:hover{color:var(--red); border-color:#7a3a2c}
+  .rb-empty{padding:22px; text-align:center; color:var(--faint); font-size:12.5px; border:1px dashed var(--edge2); border-radius:8px}
+  .rb-export{margin-top:16px}
+  .rb-export .lbl{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--faint); margin-right:6px}
+  .rb-lang{font-family:var(--mono); font-size:11.5px; color:var(--ink); background:var(--bg); border:1px solid var(--edge); border-radius:6px; padding:6px 11px; cursor:pointer; margin:3px 4px 3px 0}
+  .rb-lang:hover{color:var(--amber); border-color:var(--amber-dim)}
+  .rb-footer{display:flex; gap:8px; justify-content:space-between; margin-top:16px; flex-wrap:wrap}
+  .rb-note{font-family:var(--mono); font-size:11px; color:var(--amber); margin-top:8px}
   .tabs{display:flex; gap:4px; padding:14px 22px 0; flex-wrap:wrap}
   .tab{
     font-family:var(--mono); font-size:12px; letter-spacing:.5px; color:var(--muted);
@@ -372,6 +404,7 @@
     <option value="contrast">High Contrast</option>
     <option value="green">Terminal Green</option>
   </select>
+  <button class="toolbtn" id="runbookBtn" title="Build ordered runbooks and export them as a script">▶ Runbooks</button>
   <button class="toolbtn" id="addBtn">+ Add</button>
   <button class="toolbtn" id="saveFileBtn" title="Save your custom commands to a JSON file on the USB stick. After linking, new additions auto-save to it.">Save file</button>
   <button class="toolbtn" id="loadFileBtn" title="Load custom commands from a JSON file — e.g. after plugging the USB into another PC.">Load file</button>
@@ -391,6 +424,19 @@
 
 <footer class="foot">⚠ Authorized use &amp; education only — you are responsible for legal compliance.</footer>
 <div class="printonly printfoot">Printed from FieldKit — an offline command reference. ⚠ Authorized use &amp; education only; you are responsible for legal compliance. Verify commands before running.</div>
+
+<!-- runbooks modal -->
+<div class="scrim" id="rbScrim">
+  <div class="modal rbmodal">
+    <div class="rb-head">
+      <h3>▶ Runbooks</h3>
+      <button class="btn ghost" id="rb-close">Close</button>
+    </div>
+    <p class="sub">Ordered lists of commands you can export as one script. Add steps from any command's <b>＋ Add to runbook</b> button. Saved on this computer.</p>
+    <div id="rb-body"></div>
+    <input type="file" id="rbImportFile" accept="application/json" style="display:none">
+  </div>
+</div>
 
 <!-- add modal -->
 <div class="scrim" id="scrim">
@@ -652,6 +698,100 @@ function renderTagBar(){
   const clr=$("#tagClear"); if(clr) clr.onclick=()=>{ activeTags.clear(); renderTagBar(); renderList(); };
 }
 
+// ---- runbooks: named, ordered lists of commands, exportable as one script ----
+const RUNBOOK_KEY = "fieldkit.runbooks.v1";
+const EXAMPLE_RUNBOOKS = {
+  "IR: first 15 minutes": ["ir-collect-triage","ir-proc-suspicious","ir-proc-hash","ir-proc-netmap","ir-persistence-sweep"],
+  "AD: recon → roast": ["adx-sharphound-collect","adx-spn-discover","adx-kerberoast-impacket","adx-asrep-impacket"],
+  "Windows host triage": ["ir-collect-triage","evt-winevent-failed-4625","evt-winevent-log-cleared-1102","ir-persistence-sweep","ir-proc-hash"],
+};
+let runbooks = {};        // name -> [entry ids]
+let activeRunbook = null;
+function loadRunbooks(){
+  let raw=null; try{ raw=localStorage.getItem(RUNBOOK_KEY); }catch(e){}
+  if(raw===null){ runbooks=JSON.parse(JSON.stringify(EXAMPLE_RUNBOOKS)); activeRunbook=Object.keys(runbooks)[0]; saveRunbooks(); return; }
+  try{ const o=JSON.parse(raw)||{}; runbooks=o.books||{}; activeRunbook=o.active||null; }catch(e){ runbooks={}; activeRunbook=null; }
+  if(!activeRunbook || !runbooks[activeRunbook]) activeRunbook=Object.keys(runbooks)[0]||null;
+}
+function saveRunbooks(){ try{ localStorage.setItem(RUNBOOK_KEY, JSON.stringify({books:runbooks, active:activeRunbook})); }catch(e){} }
+function runbookCount(){ return Object.keys(runbooks).length; }
+function updateRunbookCount(){ const b=$("#runbookBtn"); if(b) b.textContent=`▶ Runbooks${runbookCount()?` (${runbookCount()})`:""}`; }
+function uniqueRunbookName(base){ let n=base,i=2; while(runbooks[n]!==undefined){ n=`${base} ${i++}`; } return n; }
+function addToRunbook(id){
+  if(!activeRunbook){ activeRunbook=uniqueRunbookName("Runbook 1"); runbooks[activeRunbook]=[]; }
+  const list=runbooks[activeRunbook];
+  if(list.includes(id)) return false;
+  list.push(id); saveRunbooks(); return true;
+}
+function moveStep(i,d){ const s=runbooks[activeRunbook]; const j=i+d; if(!s||j<0||j>=s.length) return; [s[i],s[j]]=[s[j],s[i]]; saveRunbooks(); renderRunbookModal(); }
+function removeStep(i){ const s=runbooks[activeRunbook]; if(!s) return; s.splice(i,1); saveRunbooks(); renderRunbookModal(); }
+function sessionFillValues(){ const v={}; Object.entries(sessionVars).forEach(([k,val])=>{ if(val!=="") v[k]=val; }); return v; }
+function exportRunbook(name, lang){
+  const ids=runbooks[name]||[]; const vals=sessionFillValues(); const cmt=LANGS[lang].cmt;
+  const body=[], skipped=[]; let n=0;
+  ids.forEach(id=>{
+    const e=library.find(x=>x.id===id);
+    if(!e){ skipped.push(id); return; }
+    if(!(e.code && e.code[lang])){ skipped.push(e.title); return; }
+    n++;
+    body.push(`${cmt}[${n}] ${e.title}`);
+    if(e.danger) body.push(`${cmt}    ! ${e.danger.replace(/\s+/g," ")}`);
+    body.push(fillTemplate(e.code[lang], vals), "");
+  });
+  const head=[];
+  if(lang==="linux"||lang==="mac") head.push("#!/usr/bin/env bash","");
+  head.push(`${cmt}FieldKit runbook — ${name}`, `${cmt}${LANGS[lang].name} · ${n} step${n===1?"":"s"}`, `${cmt}Review before running. Authorized use only.`, "");
+  if(skipped.length) body.push(`${cmt}skipped (no ${LANGS[lang].name} command): ${skipped.join("; ")}`);
+  download(`${slug(name)||"runbook"}.${LANGS[lang].ext}`, head.concat(body).join("\n"));
+  return {steps:n, skipped:skipped.length};
+}
+function rbNew(){ const nm=(prompt("New runbook name:","Runbook "+(runbookCount()+1))||"").trim(); if(!nm) return; const name=runbooks[nm]!==undefined?uniqueRunbookName(nm):nm; runbooks[name]=[]; activeRunbook=name; saveRunbooks(); updateRunbookCount(); renderRunbookModal(); }
+function rbRename(){ if(!activeRunbook) return; const nm=(prompt("Rename runbook:",activeRunbook)||"").trim(); if(!nm||nm===activeRunbook) return; const name=runbooks[nm]!==undefined?uniqueRunbookName(nm):nm; runbooks[name]=runbooks[activeRunbook]; delete runbooks[activeRunbook]; activeRunbook=name; saveRunbooks(); renderRunbookModal(); }
+function rbDelete(){ if(!activeRunbook) return; if(!confirm(`Delete runbook “${activeRunbook}”?`)) return; delete runbooks[activeRunbook]; activeRunbook=Object.keys(runbooks)[0]||null; saveRunbooks(); updateRunbookCount(); renderRunbookModal(); }
+function openRunbooks(){ renderRunbookModal(); $("#rbScrim").classList.add("open"); }
+function closeRunbooks(){ $("#rbScrim").classList.remove("open"); }
+function renderRunbookModal(){
+  const box=$("#rb-body"); if(!box) return;
+  const names=Object.keys(runbooks);
+  if(!names.length){ box.innerHTML=`<div class="rb-empty">No runbooks yet — open a command and click <b>＋ Add to runbook</b>, or <button class="rb-mini" id="rb-new0">New runbook</button></div>`; const nb=$("#rb-new0"); if(nb) nb.onclick=rbNew; return; }
+  if(!activeRunbook || !runbooks[activeRunbook]) activeRunbook=names[0];
+  const steps=runbooks[activeRunbook];
+  const sel=`<select id="rb-select" aria-label="Select runbook">${names.map(nm=>`<option value="${esc(nm)}" ${nm===activeRunbook?"selected":""}>${esc(nm)} (${runbooks[nm].length})</option>`).join("")}</select>`;
+  const stepsHtml = steps.length ? `<ol class="rb-steps">${steps.map((id,i)=>{
+    const e=library.find(x=>x.id===id);
+    const title=e?e.title:`(missing entry: ${id})`;
+    const cat=e?e.cat:"";
+    const langs=e&&e.code?Object.keys(e.code).filter(l=>LANGS[l]).map(l=>LANGS[l].tag).join(" "):(e?"— (no code)":"");
+    return `<li class="rb-step"><span class="num">${i+1}</span>
+      <span class="info"><div class="st-title">${esc(title)}</div><span class="st-cat">${esc(cat)}</span><span class="st-langs">${esc(langs)}</span></span>
+      <span class="st-btns">
+        <button class="rb-sbtn up" data-i="${i}" ${i===0?"disabled":""} aria-label="Move up">↑</button>
+        <button class="rb-sbtn down" data-i="${i}" ${i===steps.length-1?"disabled":""} aria-label="Move down">↓</button>
+        <button class="rb-sbtn rm" data-i="${i}" aria-label="Remove step">✕</button>
+      </span></li>`;
+  }).join("")}</ol>` : `<div class="rb-empty">This runbook is empty — open a command and click <b>＋ Add to runbook</b>.</div>`;
+  const langBtns=["ps","cmd","mac","linux","py"].map(l=>`<button class="rb-lang" data-l="${l}">${LANGS[l].name}</button>`).join("");
+  box.innerHTML=`<div class="rb-toolbar">${sel}
+      <button class="rb-mini" id="rb-new">New</button>
+      <button class="rb-mini" id="rb-rename">Rename</button>
+      <button class="rb-mini danger" id="rb-delete">Delete</button></div>
+    ${stepsHtml}
+    <div class="rb-export"><span class="lbl">Export as script</span>${langBtns}<div class="rb-note" id="rb-note"></div></div>
+    <div class="rb-footer"><span><button class="rb-mini" id="rb-savejson">Save all as JSON</button> <button class="rb-mini" id="rb-loadjson">Load JSON</button></span></div>`;
+  $("#rb-select").onchange=e=>{ activeRunbook=e.target.value; saveRunbooks(); renderRunbookModal(); };
+  $("#rb-new").onclick=rbNew; $("#rb-rename").onclick=rbRename; $("#rb-delete").onclick=rbDelete;
+  box.querySelectorAll(".rb-sbtn.up").forEach(b=>b.onclick=()=>moveStep(+b.dataset.i,-1));
+  box.querySelectorAll(".rb-sbtn.down").forEach(b=>b.onclick=()=>moveStep(+b.dataset.i,1));
+  box.querySelectorAll(".rb-sbtn.rm").forEach(b=>b.onclick=()=>removeStep(+b.dataset.i));
+  box.querySelectorAll(".rb-lang").forEach(b=>b.onclick=()=>{ const r=exportRunbook(activeRunbook,b.dataset.l); const note=$("#rb-note"); if(note) note.textContent = r.steps ? `Exported ${r.steps} step${r.steps===1?"":"s"}${r.skipped?` · skipped ${r.skipped} with no ${LANGS[b.dataset.l].name} command`:""}.` : `No steps have a ${LANGS[b.dataset.l].name} command.`; });
+  $("#rb-savejson").onclick=()=>download("fieldkit-runbooks.json", JSON.stringify(runbooks,null,2));
+  $("#rb-loadjson").onclick=()=>$("#rbImportFile").click();
+}
+function wireRunbookAdd(item){
+  const b=$("#rbAddBtn"); if(!b) return;
+  b.onclick=()=>{ const added=addToRunbook(item.id); b.textContent = added ? `Added to “${activeRunbook}” ✓` : "Already in this runbook"; b.classList.toggle("ok",added); updateRunbookCount(); setTimeout(()=>{ b.textContent="＋ Add to runbook"; b.classList.remove("ok"); },1700); };
+}
+
 function renderList(){
   let items=library.filter(matches);
   if(query){
@@ -781,7 +921,7 @@ function headBlock(item){
       ${item.danger?`<div class="warn">⚠ ${esc(item.danger)}</div>`:""}
       ${badges}
       ${tagChips(item)}
-      <div class="reportrow"><a class="report" href="${reportUrl(item)}" target="_blank" rel="noopener" title="Open a prefilled GitHub issue for this entry">⚑ Report an incorrect command</a></div>
+      <div class="reportrow">${item.code?`<button class="rb-add" id="rbAddBtn">＋ Add to runbook</button>`:""}<a class="report" href="${reportUrl(item)}" target="_blank" rel="noopener" title="Open a prefilled GitHub issue for this entry">⚑ Report an incorrect command</a></div>
     </div>`;
 }
 function wireFav(item){
@@ -859,7 +999,7 @@ function renderDetail(){
   $("#editBtn").onclick=()=>openModal(item.id);
   $("#copyBtn").onclick=()=>copyText(fillTemplate(raw, phValues), $("#copyBtn"));
   $("#dlBtn").onclick=()=>download(fname, fillTemplate(raw, phValues));
-  wireFav(item); wireRelated();
+  wireFav(item); wireRelated(); wireRunbookAdd(item);
 }
 
 function renderToolDetail(item){
@@ -1113,6 +1253,24 @@ $("#teamfilter").querySelectorAll("button").forEach(b=>{
 });
 $("#themeSel").onchange=e=>applyTheme(e.target.value);
 
+/* ---------- runbooks wiring ---------- */
+$("#runbookBtn").onclick=openRunbooks;
+$("#rb-close").onclick=closeRunbooks;
+$("#rbScrim").onclick=e=>{ if(e.target===$("#rbScrim")) closeRunbooks(); };
+$("#rbImportFile").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{
+    const data=JSON.parse(r.result);
+    if(data && typeof data==="object" && !Array.isArray(data)){
+      Object.entries(data).forEach(([nm,ids])=>{ if(Array.isArray(ids)) runbooks[nm]=ids.filter(x=>typeof x==="string"); });
+      activeRunbook=activeRunbook||Object.keys(runbooks)[0]||null;
+      saveRunbooks(); updateRunbookCount(); renderRunbookModal();
+    } else alert("That file isn't a FieldKit runbooks JSON.");
+  }catch(err){ alert("Couldn't read that JSON file."); } };
+  r.readAsText(f); e.target.value="";
+};
+
 /* ---------- utils ---------- */
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40); }
@@ -1243,6 +1401,7 @@ $("#loadFileBtn").onclick = loadFromFile;
 document.addEventListener("keydown", e=>{
   const tag=(e.target.tagName||"").toLowerCase();
   const typing = tag==="input"||tag==="textarea"||tag==="select";
+  if($("#rbScrim").classList.contains("open")){ if(e.key==="Escape") closeRunbooks(); return; }
   if(scrim.classList.contains("open")){ if(e.key==="Escape") closeModal(); return; }
   if(e.key==="/" && !typing){ e.preventDefault(); $("#q").focus(); return; }
   if(typing) return;
@@ -1269,9 +1428,11 @@ loadTheme();
 loadCollapsed();
 loadFavorites();
 loadSession();
+loadRunbooks();
 loadLocalCustoms();
 renderRail();
 renderSessionBar();
+updateRunbookCount();
 renderList();
 if(!openFromHash()) showPlaceholder();   // deep-link to #id, else show the welcome screen
 tryReconnectFile();
