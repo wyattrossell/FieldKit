@@ -58,6 +58,19 @@ Two ways to run it, both fully offline:
   library via `<script src>` so it works from `file://`, where a fetched `.json` would be blocked).
   Copy both to a USB drive and open the HTML. That's it.
 
+## Build a single file
+
+The repo keeps the app and its library split for clean diffs. To produce the
+self-contained single file (inlined data, no external references):
+
+```sh
+npm run build      # or: node build.js
+```
+
+This writes `dist/FieldKit.html` (the one-file release artifact) and
+`dist/index.html` (the GitHub Pages entry point). No dependencies — plain Node.
+`dist/` is git-ignored; it's shipped via releases and the live demo, not committed.
+
 ## Repository layout
 
 | File | Purpose |

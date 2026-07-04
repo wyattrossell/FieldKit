@@ -1,0 +1,15 @@
+{
+  "name": "fieldkit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline, single-file purple-team command reference that runs from file:// or a USB drive.",
+  "scripts": {
+    "build": "node build.js",
+    "validate": "node validate.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wyattrossell/FieldKit.git"
+  },
+  "license": "MIT"
+}
