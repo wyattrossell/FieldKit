@@ -50,8 +50,11 @@
   /* ---------- header ---------- */
   header{
     border-bottom:1px solid var(--edge); background:var(--panel);
-    padding:12px 18px; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    padding:10px 16px; display:flex; align-items:center; gap:11px;
+    flex-wrap:nowrap; overflow-x:auto;   /* one row only — scrolls if the screen is too narrow */
   }
+  header > *{flex:none}                  /* controls keep their size... */
+  header .search{flex:1 1 200px; min-width:150px}  /* ...search absorbs the slack */
   .brand{display:flex; align-items:baseline; gap:10px; font-family:var(--mono)}
   .brand .mark{
     color:var(--amber); font-weight:700; letter-spacing:.5px; font-size:17px;
@@ -77,8 +80,6 @@
   }
   .langfilter button:hover{color:var(--ink)}
   .langfilter button.on{background:var(--panel2); color:var(--amber); box-shadow:inset 0 0 0 1px var(--edge2)}
-  .teamfilter button{display:flex; align-items:center; gap:5px}
-  .teamfilter button .teamdot{margin:0}
   select.toolbtn{appearance:auto; -webkit-appearance:auto}
   .toolbtn{
     font-family:var(--mono); font-size:11px; letter-spacing:.5px; color:var(--muted);
@@ -86,6 +87,7 @@
   }
   .toolbtn:hover{color:var(--ink); border-color:var(--edge2)}
   .ostoggle.on{color:var(--amber); border-color:var(--amber-dim); background:var(--panel2)}
+  select.toolbtn.compact{padding:6px 4px 6px 8px; font-size:11px}
   /* ---------- body ---------- */
   main{flex:1; display:grid; grid-template-columns:190px 340px 1fr; min-height:0}
   .rail{border-right:1px solid var(--edge); background:var(--panel); overflow-y:auto; padding:10px 0}
@@ -432,18 +434,18 @@
     <button data-l="py">PY</button>
   </div>
   <button class="toolbtn ostoggle" id="osDetectBtn" title="When on, each command opens on your OS's shell tab" aria-pressed="true">⌖ OS</button>
-  <div class="langfilter teamfilter" id="teamfilter" title="Filter by team">
-    <button data-tm="all" class="on">ALL</button>
-    <button data-tm="blue"><span class="teamdot blue"></span>BLUE</button>
-    <button data-tm="red"><span class="teamdot red"></span>RED</button>
-    <button data-tm="purple"><span class="teamdot purple"></span>PURPLE</button>
-  </div>
-  <select class="toolbtn" id="themeSel" title="Color theme">
-    <option value="amber">Field Amber</option>
-    <option value="slate">Night Slate</option>
-    <option value="paper">Paper (light)</option>
-    <option value="contrast">High Contrast</option>
-    <option value="green">Terminal Green</option>
+  <select class="toolbtn compact" id="teamSel" title="Filter by team" aria-label="Filter by team">
+    <option value="all">All teams</option>
+    <option value="blue">🔵 Blue</option>
+    <option value="red">🔴 Red</option>
+    <option value="purple">🟣 Purple</option>
+  </select>
+  <select class="toolbtn compact" id="themeSel" title="Color theme" aria-label="Color theme">
+    <option value="amber">Amber</option>
+    <option value="slate">Slate</option>
+    <option value="paper">Paper</option>
+    <option value="contrast">Contrast</option>
+    <option value="green">Green</option>
   </select>
   <button class="toolbtn" id="attackBtn" title="ATT&amp;CK technique coverage & detection gaps">⚔ ATT&amp;CK</button>
   <button class="toolbtn" id="runbookBtn" title="Build ordered runbooks and export them as a script">▶ Runbooks</button>
@@ -1010,7 +1012,7 @@ function clearAllFilters(){
   activeCat="All"; activeTeam="all"; activeLangFilter="all"; activeTags.clear(); query=""; tagsExpanded=false;
   const q=$("#q"); if(q) q.value="";
   $("#langfilter").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.l==="all"));
-  $("#teamfilter").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.tm==="all"));
+  const ts=$("#teamSel"); if(ts) ts.value="all";
   renderRail(); renderList();
 }
 function openFromHash(){
@@ -1407,13 +1409,7 @@ $("#langfilter").querySelectorAll("button").forEach(b=>{
     tagsExpanded=false; renderTagBar(); renderList(); if(selectedId) renderDetail();
   };
 });
-$("#teamfilter").querySelectorAll("button").forEach(b=>{
-  b.onclick=()=>{
-    $("#teamfilter").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
-    b.classList.add("on"); activeTeam=b.dataset.tm; tagsExpanded=false;
-    renderTagBar(); renderList();
-  };
-});
+$("#teamSel").onchange=e=>{ activeTeam=e.target.value; tagsExpanded=false; renderTagBar(); renderList(); };
 $("#themeSel").onchange=e=>applyTheme(e.target.value);
 $("#osDetectBtn").onclick=()=>{ osDetect=!osDetect; try{ localStorage.setItem(OSDETECT_KEY, osDetect?"1":"0"); }catch(e){} applyOsDetectBtn(); if(selectedId) select(selectedId); };
 
