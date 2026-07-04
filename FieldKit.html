@@ -293,6 +293,15 @@
   .listhdr{position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 16px; background:var(--panel); border-bottom:1px solid var(--edge); font-family:var(--mono); font-size:11px; color:var(--faint)}
   .listhdr .clearf{cursor:pointer; color:var(--amber); text-decoration:underline; white-space:nowrap}
   .listhdr .clearf:hover{color:var(--ink)}
+  .listhdr .hdr-right{display:flex; gap:10px; align-items:center}
+  .copyview{font-family:var(--mono); font-size:10px; color:var(--teal); background:transparent; border:1px solid var(--edge); border-radius:5px; padding:2px 7px; cursor:pointer; white-space:nowrap}
+  .copyview:hover{color:var(--ink); border-color:var(--teal)}
+  .copyview-pop{position:fixed; z-index:30; background:var(--panel); border:1px solid var(--edge2); border-radius:8px; padding:12px; box-shadow:0 8px 26px rgba(0,0,0,.45); max-width:340px}
+  .cv-title{font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:9px}
+  .cv-langs{display:flex; gap:6px; flex-wrap:wrap}
+  .cv-lang{font-family:var(--mono); font-size:11.5px; color:var(--ink); background:var(--bg); border:1px solid var(--edge); border-radius:6px; padding:6px 10px; cursor:pointer}
+  .cv-lang:hover{color:var(--amber); border-color:var(--amber-dim)}
+  .cv-status{font-family:var(--mono); font-size:10.5px; color:var(--green); margin-top:9px; min-height:12px}
   /* mobile category selector (rail is hidden < 900px) */
   select#catSel{display:none}
   /* keyboard focus visibility */
@@ -729,12 +738,11 @@ function addToRunbook(id){
 function moveStep(i,d){ const s=runbooks[activeRunbook]; const j=i+d; if(!s||j<0||j>=s.length) return; [s[i],s[j]]=[s[j],s[i]]; saveRunbooks(); renderRunbookModal(); }
 function removeStep(i){ const s=runbooks[activeRunbook]; if(!s) return; s.splice(i,1); saveRunbooks(); renderRunbookModal(); }
 function sessionFillValues(){ const v={}; Object.entries(sessionVars).forEach(([k,val])=>{ if(val!=="") v[k]=val; }); return v; }
-function exportRunbook(name, lang){
-  const ids=runbooks[name]||[]; const vals=sessionFillValues(); const cmt=LANGS[lang].cmt;
+function scriptFromEntries(entries, lang, title){
+  const vals=sessionFillValues(); const cmt=LANGS[lang].cmt;
   const body=[], skipped=[]; let n=0;
-  ids.forEach(id=>{
-    const e=library.find(x=>x.id===id);
-    if(!e){ skipped.push(id); return; }
+  entries.forEach(e=>{
+    if(!e){ skipped.push("(missing entry)"); return; }
     if(!(e.code && e.code[lang])){ skipped.push(e.title); return; }
     n++;
     body.push(`${cmt}[${n}] ${e.title}`);
@@ -743,10 +751,47 @@ function exportRunbook(name, lang){
   });
   const head=[];
   if(lang==="linux"||lang==="mac") head.push("#!/usr/bin/env bash","");
-  head.push(`${cmt}FieldKit runbook — ${name}`, `${cmt}${LANGS[lang].name} · ${n} step${n===1?"":"s"}`, `${cmt}Review before running. Authorized use only.`, "");
+  head.push(`${cmt}${title}`, `${cmt}${LANGS[lang].name} · ${n} command${n===1?"":"s"}`, `${cmt}Review before running. Authorized use only.`, "");
   if(skipped.length) body.push(`${cmt}skipped (no ${LANGS[lang].name} command): ${skipped.join("; ")}`);
-  download(`${slug(name)||"runbook"}.${LANGS[lang].ext}`, head.concat(body).join("\n"));
-  return {steps:n, skipped:skipped.length};
+  return { text: head.concat(body).join("\n"), n, skipped:skipped.length };
+}
+function exportRunbook(name, lang){
+  const entries=(runbooks[name]||[]).map(id=>library.find(x=>x.id===id));
+  const r=scriptFromEntries(entries, lang, `FieldKit runbook — ${name}`);
+  download(`${slug(name)||"runbook"}.${LANGS[lang].ext}`, r.text);
+  return {steps:r.n, skipped:r.skipped};
+}
+
+// ---- copy the current filtered view as one script (tiny language picker) ----
+function fbCopy(text){ try{ const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); const ok=document.execCommand("copy"); ta.remove(); return ok; }catch(e){ return false; } }
+function copyPlain(text, cb){
+  if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(text).then(()=>cb(true)).catch(()=>cb(fbCopy(text))); }
+  else { cb(fbCopy(text)); }
+}
+function scopeLabel(){ if(activeCat==="__fav") return "Favorites"; if(activeCat!=="All") return activeCat; if(query) return `search “${query}”`; if(activeTeam!=="all") return activeTeam+" team"; return "all commands"; }
+function cvOutside(e){ const p=$("#copyViewPop"); if(p && !p.contains(e.target) && e.target.id!=="copyViewBtn") closeCopyViewPicker(); }
+function closeCopyViewPicker(){ const p=$("#copyViewPop"); if(p) p.remove(); document.removeEventListener("mousedown", cvOutside); }
+function openCopyViewPicker(btn){
+  closeCopyViewPicker();
+  const items=library.filter(matches);
+  const pop=document.createElement("div"); pop.className="copyview-pop"; pop.id="copyViewPop";
+  pop.innerHTML=`<div class="cv-title">Copy ${items.length} shown command${items.length===1?"":"s"} (${esc(scopeLabel())}) as…</div>`
+    +`<div class="cv-langs">${["ps","cmd","mac","linux","py"].map(l=>`<button class="cv-lang" data-l="${l}">${LANGS[l].name}</button>`).join("")}</div>`
+    +`<div class="cv-status" id="cvStatus"></div>`;
+  document.body.appendChild(pop);
+  const r=btn.getBoundingClientRect();
+  pop.style.top=(r.bottom+6)+"px";
+  pop.style.left=Math.min(Math.max(8,r.left),(window.innerWidth-pop.offsetWidth-8))+"px";
+  pop.querySelectorAll(".cv-lang").forEach(b=>b.onclick=()=>{
+    const lang=b.dataset.l, st=$("#cvStatus");
+    const res=scriptFromEntries(items, lang, `FieldKit — ${scopeLabel()}`);
+    if(!res.n){ st.textContent=`No shown command has a ${LANGS[lang].name} version.`; return; }
+    copyPlain(res.text, ok=>{
+      if(ok) st.textContent=`✓ Copied ${res.n} command${res.n===1?"":"s"}${res.skipped?` (${res.skipped} skipped)`:""}.`;
+      else { download(`fieldkit-view.${LANGS[lang].ext}`, res.text); st.textContent=`⚠ Clipboard blocked — downloaded ${res.n} instead.`; }
+    });
+  });
+  setTimeout(()=>document.addEventListener("mousedown", cvOutside),0);
 }
 function rbNew(){ const nm=(prompt("New runbook name:","Runbook "+(runbookCount()+1))||"").trim(); if(!nm) return; const name=runbooks[nm]!==undefined?uniqueRunbookName(nm):nm; runbooks[name]=[]; activeRunbook=name; saveRunbooks(); updateRunbookCount(); renderRunbookModal(); }
 function rbRename(){ if(!activeRunbook) return; const nm=(prompt("Rename runbook:",activeRunbook)||"").trim(); if(!nm||nm===activeRunbook) return; const name=runbooks[nm]!==undefined?uniqueRunbookName(nm):nm; runbooks[name]=runbooks[activeRunbook]; delete runbooks[activeRunbook]; activeRunbook=name; saveRunbooks(); renderRunbookModal(); }
@@ -796,6 +841,7 @@ function wireRunbookAdd(item){
 }
 
 function renderList(){
+  closeCopyViewPicker();
   let items=library.filter(matches);
   if(query){
     // rank title matches first (typing a command name should surface that command)
@@ -803,7 +849,10 @@ function renderList(){
     items=items.map((it,i)=>[it,i]).sort((a,b)=>(score(a[0])-score(b[0]))||(a[1]-b[1])).map(p=>p[0]);
   }
   const hdr=`<div class="listhdr"><span>${items.length} result${items.length===1?"":"s"}</span>`
-          + `${filtersActive()?`<span class="clearf" id="clearFilters" role="button" tabindex="0">clear filters</span>`:""}</div>`;
+          + `<span class="hdr-right">`
+          + `${items.length?`<button class="copyview" id="copyViewBtn" title="Copy the shown commands as one script">⎘ Copy as script</button>`:""}`
+          + `${filtersActive()?`<span class="clearf" id="clearFilters" role="button" tabindex="0">clear filters</span>`:""}`
+          + `</span></div>`;
   if(!items.length){
     listEl.innerHTML=hdr+`<div class="empty">No tasks match.<br>Try a different search, team, or language.</div>`;
     wireClearFilters();
@@ -828,9 +877,9 @@ function renderList(){
   wireClearFilters();
 }
 function wireClearFilters(){
-  const cf=$("#clearFilters"); if(!cf) return;
-  cf.onclick=clearAllFilters;
-  cf.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); clearAllFilters(); } };
+  const cf=$("#clearFilters");
+  if(cf){ cf.onclick=clearAllFilters; cf.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); clearAllFilters(); } }; }
+  const cvb=$("#copyViewBtn"); if(cvb) cvb.onclick=()=>openCopyViewPicker(cvb);
 }
 
 function select(id){
