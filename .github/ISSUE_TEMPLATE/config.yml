@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Authorized-use & legal notice
+    url: https://github.com/wyattrossell/FieldKit/blob/main/DISCLAIMER.md
+    about: FieldKit is for authorized use and education only.

@@ -204,6 +204,9 @@
     background:rgba(217,116,79,.09); border:1px solid rgba(217,116,79,.35); color:var(--red);
     padding:7px 11px; border-radius:6px; font-size:12.5px; font-family:var(--mono);
   }
+  .reportrow{margin-top:12px}
+  .report{font-family:var(--mono); font-size:10.5px; color:var(--faint); text-decoration:none; border:1px solid var(--edge); border-radius:5px; padding:3px 9px}
+  .report:hover{color:var(--amber); border-color:var(--amber-dim)}
   .tabs{display:flex; gap:4px; padding:14px 22px 0; flex-wrap:wrap}
   .tab{
     font-family:var(--mono); font-size:12px; letter-spacing:.5px; color:var(--muted);
@@ -284,7 +287,7 @@
     html,body{ height:auto; overflow:visible; background:#fff; color:#000; }
     body{ display:block; font-family:var(--sans); font-size:11pt; }
     header, footer, .tagbar, .rail, .list, .scrim,
-    .tabs, .acts, .favbtn, .cron-presets, .placeholder, .inst-copy{ display:none !important; }
+    .tabs, .acts, .favbtn, .cron-presets, .placeholder, .inst-copy, .reportrow{ display:none !important; }
     main{ display:block; height:auto; min-height:0; }
     .detail{ display:block; overflow:visible; background:#fff; }
     .detail .head{ border:0; padding:0 0 10pt; }
@@ -681,6 +684,22 @@ function attackBadges(item){
 function tagChips(item){
   return (item.tags&&item.tags.length) ? `<div class="tagrow">${item.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>` : "";
 }
+const REPO = "wyattrossell/FieldKit";   // for the "report incorrect command" link
+function reportUrl(item){
+  const title = `[incorrect] ${item.id}`;
+  const body =
+`Entry id: \`${item.id}\`
+Title: ${item.title}
+Category: ${item.cat}
+
+### What's wrong
+
+
+### What it should be (include the OS/shell, and a source if you can)
+`;
+  return `https://github.com/${REPO}/issues/new?labels=incorrect-command`
+       + `&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+}
 function headBlock(item){
   const badges=(teamBadge(item)||attackBadges(item)) ? `<div class="badges">${teamBadge(item)}${attackBadges(item)}</div>` : "";
   return `<div class="head">
@@ -691,6 +710,7 @@ function headBlock(item){
       ${item.danger?`<div class="warn">⚠ ${esc(item.danger)}</div>`:""}
       ${badges}
       ${tagChips(item)}
+      <div class="reportrow"><a class="report" href="${reportUrl(item)}" target="_blank" rel="noopener" title="Open a prefilled GitHub issue for this entry">⚑ Report an incorrect command</a></div>
     </div>`;
 }
 function wireFav(item){
