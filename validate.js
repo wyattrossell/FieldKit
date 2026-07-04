@@ -14,6 +14,7 @@ const LIB = global.window.FIELDKIT_LIBRARY;
 const CODE_KEYS    = ["ps", "cmd", "mac", "linux", "py", "dork", "sql"];
 const INSTALL_KEYS = ["cmd", "mac", "linux"];
 const WIDGETS      = ["cron"];
+const LEVELS       = ["beginner", "intermediate", "advanced"];
 const TEAMS        = ["blue", "red", "purple"];
 const PLATFORMS    = ["windows", "macos", "linux"];
 const ID_RE        = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -98,6 +99,18 @@ for (const e of LIB) {
     if (!Array.isArray(e.related)) err(id, "related must be an array");
     else if (e.related.includes(e.id)) err(id, "related must not reference itself");
   }
+  // optional metadata (backward compatible — rendered only when present)
+  if (e.requires !== undefined) {
+    if (typeof e.requires !== "object" || Array.isArray(e.requires)) err(id, "requires must be an object");
+    else {
+      if ("elevation" in e.requires && typeof e.requires.elevation !== "boolean") err(id, "requires.elevation must be a boolean");
+      if ("tool" in e.requires && typeof e.requires.tool !== "string") err(id, "requires.tool must be a string");
+      if ("os" in e.requires && typeof e.requires.os !== "string") err(id, "requires.os must be a string");
+    }
+  }
+  if (e.updated !== undefined && !/^\d{4}-\d{2}$/.test(String(e.updated))) err(id, `updated must be "YYYY-MM"`);
+  if (e.level !== undefined && !LEVELS.includes(e.level)) err(id, `level must be one of ${LEVELS.join("/")}`);
+  if (e.example_output !== undefined && (typeof e.example_output !== "string" || !e.example_output.trim())) err(id, "example_output must be a non-empty string");
 
   // purple-team rule: offensive entries must be paired with detection guidance
   if (e.team === "red" || e.team === "purple") {

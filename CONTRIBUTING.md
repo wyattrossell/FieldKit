@@ -29,6 +29,17 @@ offline from `file://`. Please don't add build steps, frameworks, or network cal
 Include **only** the code targets that genuinely apply. `dork` (Google search) and
 `sql` render as single-tab query types.
 
+### Optional metadata (all backward compatible — rendered only when present)
+
+```js
+  related:["other-id","…"],                 // "Related / next steps" links (ids must exist)
+  requires:{ elevation:true,                // → small badges: needs admin/root/sudo,
+             tool:"nmap", os:"Windows 10+"},//   a non-default tool, or an OS requirement
+  level:"beginner"|"intermediate"|"advanced", // shown as a badge (and in the ATT&CK/teaching lens)
+  updated:"2026-07",                        // "YYYY-MM" freshness stamp (use on destructive/offensive)
+  example_output:"…what success looks like" // rendered as an "Example output" block under the code
+```
+
 ## Tool entry schema (Tools category)
 
 ```js

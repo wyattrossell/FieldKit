@@ -139,6 +139,16 @@
   a.att{font-family:var(--mono); font-size:10px; color:var(--teal); border:1px solid #2f5a5f; border-radius:4px; padding:2px 6px; text-decoration:none}
   a.att:hover{background:rgba(87,182,189,.12)}
   .tagrow{margin-top:9px; display:flex; gap:5px; flex-wrap:wrap}
+  .metarow{margin-top:10px; display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+  .metarow .req{font-family:var(--mono); font-size:10px; color:var(--red); border:1px solid rgba(217,116,79,.4); border-radius:10px; padding:2px 8px}
+  .metarow .lvl{font-family:var(--mono); font-size:10px; letter-spacing:.5px; text-transform:uppercase; border-radius:10px; padding:2px 8px; border:1px solid}
+  .lvl-beginner{color:var(--green); border-color:#3a5c33}
+  .lvl-intermediate{color:var(--amber); border-color:var(--amber-dim)}
+  .lvl-advanced{color:var(--red); border-color:#7a3a2c}
+  .metarow .updated{font-family:var(--mono); font-size:10px; color:var(--faint)}
+  .exout{margin:0 22px 20px}
+  .exout-h{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--faint); margin-bottom:6px}
+  .exout-pre{margin:0; padding:12px 14px; background:var(--panel); border:1px solid var(--edge); border-left:3px solid var(--green); border-radius:6px; font-family:var(--mono); font-size:12px; line-height:1.55; color:var(--muted); white-space:pre-wrap; overflow-x:auto}
   .tag{font-family:var(--mono); font-size:10px; color:var(--muted); background:var(--panel2); border:1px solid var(--edge2); border-radius:10px; padding:2px 8px}
   .phbar{display:flex; gap:10px; flex-wrap:wrap; padding:12px 22px 0}
   .phf{display:flex; flex-direction:column; gap:3px}
@@ -948,6 +958,18 @@ function tagChips(item){
   return (item.tags&&item.tags.length) ? `<div class="tagrow">${item.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>` : "";
 }
 const REPO = "wyattrossell/FieldKit";   // for the "report incorrect command" link
+function metaBadges(item){
+  const bits=[];
+  if(item.level) bits.push(`<span class="lvl lvl-${esc(item.level)}">${esc(item.level)}</span>`);
+  const r=item.requires;
+  if(r){
+    if(r.elevation) bits.push(`<span class="req" title="Requires elevation (admin / root / sudo)">⭡ elevation</span>`);
+    if(r.tool)      bits.push(`<span class="req" title="Requires a non-default tool">🔧 ${esc(r.tool)}</span>`);
+    if(r.os)        bits.push(`<span class="req" title="OS requirement">🖥 ${esc(r.os)}</span>`);
+  }
+  if(item.updated) bits.push(`<span class="updated" title="Last reviewed">updated ${esc(item.updated)}</span>`);
+  return bits.length ? `<div class="metarow">${bits.join("")}</div>` : "";
+}
 function reportUrl(item){
   const title = `[incorrect] ${item.id}`;
   const body =
@@ -973,6 +995,7 @@ function headBlock(item){
       ${item.danger?`<div class="warn">⚠ ${esc(item.danger)}</div>`:""}
       ${badges}
       ${tagChips(item)}
+      ${metaBadges(item)}
       <div class="reportrow">${item.code?`<button class="rb-add" id="rbAddBtn">＋ Add to runbook</button>`:""}<a class="report" href="${reportUrl(item)}" target="_blank" rel="noopener" title="Open a prefilled GitHub issue for this entry">⚑ Report an incorrect command</a></div>
     </div>`;
 }
@@ -1037,6 +1060,7 @@ function renderDetail(){
       </div>
       <pre id="codeEl"></pre>
     </div>
+    ${item.example_output?`<div class="exout"><div class="exout-h">Example output — what success looks like</div><pre class="exout-pre">${esc(item.example_output)}</pre></div>`:""}
     ${dm}
     ${relatedBlock(item)}`;
   const paint=()=>{ $("#codeEl").textContent=fillTemplate(raw, phValues); };
