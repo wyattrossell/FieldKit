@@ -143,6 +143,7 @@
   .phbar{display:flex; gap:10px; flex-wrap:wrap; padding:12px 22px 0}
   .phf{display:flex; flex-direction:column; gap:3px}
   .phf label{font-family:var(--mono); font-size:10px; letter-spacing:.5px; color:var(--faint); text-transform:uppercase}
+  .phf-sess{color:var(--amber); border:1px solid var(--amber-dim); border-radius:6px; padding:0 5px; font-size:8.5px; margin-left:4px; text-transform:none}
   .phf input{background:var(--bg); border:1px solid var(--edge); border-radius:5px; color:var(--amber); font-family:var(--mono); font-size:12px; padding:6px 9px; outline:none; min-width:150px}
   .phf input:focus{border-color:var(--amber-dim)}
   .dm{margin:2px 22px 22px; display:flex; flex-direction:column; gap:8px}
@@ -204,6 +205,22 @@
     background:rgba(217,116,79,.09); border:1px solid rgba(217,116,79,.35); color:var(--red);
     padding:7px 11px; border-radius:6px; font-size:12.5px; font-family:var(--mono);
   }
+  /* global session variables bar */
+  .sessionbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:7px 18px; border-bottom:1px solid var(--edge); background:var(--panel)}
+  .sessionbar:empty{display:none}
+  .sess-toggle{font-family:var(--mono); font-size:10.5px; letter-spacing:.5px; color:var(--muted); background:var(--bg); border:1px solid var(--edge); border-radius:6px; padding:4px 10px; cursor:pointer}
+  .sess-toggle:hover{color:var(--ink)}
+  .sess-count{color:#1a1206; background:var(--amber); border-radius:8px; padding:0 6px; margin-left:5px; font-size:10px}
+  .sess-summary{font-family:var(--mono); font-size:10.5px; color:var(--amber); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60vw}
+  .sess-hint{font-family:var(--mono); font-size:10.5px; color:var(--faint)}
+  .sess-fields{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+  .sess-f{display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:9.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.5px}
+  .sess-f input{background:var(--bg); border:1px solid var(--edge); border-radius:5px; color:var(--amber); font-family:var(--mono); font-size:11.5px; padding:4px 7px; width:118px; text-transform:none; letter-spacing:0}
+  .sess-f input:focus{border-color:var(--amber-dim); outline:none}
+  .sess-newvar{background:var(--bg); border:1px dashed var(--edge2); border-radius:5px; color:var(--muted); font-family:var(--mono); font-size:11px; padding:4px 7px; width:96px}
+  .sess-newvar:focus{border-color:var(--amber-dim); outline:none}
+  .sess-clear{font-family:var(--mono); font-size:10.5px; color:var(--faint); background:transparent; border:1px solid var(--edge); border-radius:5px; padding:4px 9px; cursor:pointer}
+  .sess-clear:hover{color:var(--amber); border-color:var(--amber-dim)}
   .reportrow{margin-top:12px}
   .report{font-family:var(--mono); font-size:10.5px; color:var(--faint); text-decoration:none; border:1px solid var(--edge); border-radius:5px; padding:3px 9px}
   .report:hover{color:var(--amber); border-color:var(--amber-dim)}
@@ -286,7 +303,7 @@
     @page{ margin:1.6cm; }
     html,body{ height:auto; overflow:visible; background:#fff; color:#000; }
     body{ display:block; font-family:var(--sans); font-size:11pt; }
-    header, footer, .tagbar, .rail, .list, .scrim,
+    header, footer, .tagbar, .sessionbar, .rail, .list, .scrim,
     .tabs, .acts, .favbtn, .cron-presets, .placeholder, .inst-copy, .reportrow{ display:none !important; }
     main{ display:block; height:auto; min-height:0; }
     .detail{ display:block; overflow:visible; background:#fff; }
@@ -364,6 +381,7 @@
 </header>
 
 <div class="tagbar" id="tagbar"></div>
+<div class="sessionbar" id="sessionbar"></div>
 
 <main>
   <nav class="rail" id="rail"><h4>Categories</h4></nav>
@@ -432,6 +450,59 @@ let selectedLang = null;
 let activeTags = new Set();
 let tagsExpanded = false;
 const TAG_CAP = 20;
+
+// ---- global session variables: set {{TARGET}}, {{USER}}, ... once; they seed
+// every command's placeholders (per-snippet inputs still override locally) ----
+const SESSION_KEY = "fieldkit.session.v1";
+const SESSION_DEFAULTS = ["TARGET","DOMAIN","USER","PASS","IP","HOST","DC_IP","IFACE","URL","WORDLIST"];
+let sessionVars = {};       // NAME -> value
+let sessionOpen = false;
+function loadSession(){ try{ sessionVars = JSON.parse(localStorage.getItem(SESSION_KEY)||"{}") || {}; }catch(e){ sessionVars = {}; } }
+function saveSession(){ try{ localStorage.setItem(SESSION_KEY, JSON.stringify(sessionVars)); }catch(e){} }
+function sessionValue(name){ return (sessionVars[name] !== undefined && sessionVars[name] !== "") ? sessionVars[name] : undefined; }
+function sessionVarNames(){
+  const names = [...SESSION_DEFAULTS];
+  Object.keys(sessionVars).forEach(n => { if(!names.includes(n)) names.push(n); });
+  return names;
+}
+function renderSessionBar(){
+  const el = document.querySelector("#sessionbar"); if(!el) return;
+  const setCount = Object.values(sessionVars).filter(v => v !== "").length;
+  if(!sessionOpen){
+    const summary = Object.entries(sessionVars).filter(([,v]) => v !== "")
+      .map(([k,v]) => `${k}=${v}`).slice(0,4).join(" · ");
+    el.innerHTML =
+      `<button class="sess-toggle" id="sessToggle" aria-expanded="false">⚙ Session variables${setCount?` <span class="sess-count">${setCount}</span>`:""}</button>`
+      + (summary ? `<span class="sess-summary">${esc(summary)}</span>`
+                 : `<span class="sess-hint">set values like {{TARGET}} once — they fill every command shown</span>`);
+    $("#sessToggle").onclick = () => { sessionOpen = true; renderSessionBar(); };
+    return;
+  }
+  el.innerHTML =
+    `<button class="sess-toggle" id="sessToggle" aria-expanded="true">⚙ Session variables ▾</button>`
+    + `<div class="sess-fields">`
+    + sessionVarNames().map(n =>
+        `<label class="sess-f"><span>${esc(n)}</span><input class="sess-in" data-n="${esc(n)}" value="${esc(sessionVars[n]||"")}" placeholder="—" spellcheck="false" autocomplete="off" aria-label="Session value for ${esc(n)}"></label>`
+      ).join("")
+    + `<input class="sess-newvar" id="sessNew" placeholder="+ add var" spellcheck="false" autocomplete="off" title="Type a NAME and press Enter">`
+    + (setCount ? `<button class="sess-clear" id="sessClear">clear</button>` : "")
+    + `</div>`;
+  el.querySelectorAll(".sess-in").forEach(inp => {
+    inp.oninput = () => { sessionVars[inp.dataset.n] = inp.value; saveSession(); if(selectedId) renderDetail(); };
+  });
+  $("#sessToggle").onclick = () => { sessionOpen = false; renderSessionBar(); };
+  const nv = $("#sessNew");
+  if(nv) nv.onkeydown = e => {
+    if(e.key !== "Enter") return;
+    const n = nv.value.trim().toUpperCase().replace(/[^A-Z0-9_]/g,"");
+    if(n && !(n in sessionVars) && !SESSION_DEFAULTS.includes(n)){
+      sessionVars[n] = ""; saveSession(); renderSessionBar();
+      const f = document.querySelector(`.sess-in[data-n="${n}"]`); if(f) f.focus();
+    } else { nv.value = ""; }
+  };
+  const clr = $("#sessClear");
+  if(clr) clr.onclick = () => { sessionVars = {}; saveSession(); renderSessionBar(); if(selectedId) renderDetail(); };
+}
 
 // category rail grouped into collapsible domains (order matters; any category
 // not listed falls into an auto "Other" group so nothing is ever hidden)
@@ -749,10 +820,12 @@ function renderDetail(){
   const meta=LANGS[selectedLang];
   const raw=item.code[selectedLang];
   const phs=parsePlaceholders(raw);
-  const phValues={}; phs.forEach(p=>phValues[p.name]=p.def);
+  const phValues={}; phs.forEach(p=>{ const sv=sessionValue(p.name); phValues[p.name] = (sv!==undefined) ? sv : p.def; });
   const fname=`${slug(item.title)}.${meta.ext}`;
-  const phbar=phs.length ? `<div class="phbar">${phs.map(p=>
-    `<div class="phf"><label>${esc(p.name)}</label><input data-ph="${esc(p.name)}" value="${esc(p.def)}" spellcheck="false"></div>`).join("")}</div>` : "";
+  const phbar=phs.length ? `<div class="phbar">${phs.map(p=>{
+    const seeded = sessionValue(p.name) !== undefined;
+    return `<div class="phf"><label>${esc(p.name)}${seeded?` <span class="phf-sess" title="from a session variable">session</span>`:""}</label><input data-ph="${esc(p.name)}" value="${esc(phValues[p.name])}" spellcheck="false"></div>`;
+  }).join("")}</div>` : "";
   const dm=(item.detect||item.mitigate) ? `<div class="dm">
       ${item.detect?`<div class="dm-row"><span class="dm-k detect">Detect</span><span>${esc(item.detect)}</span></div>`:""}
       ${item.mitigate?`<div class="dm-row"><span class="dm-k mitigate">Mitigate</span><span>${esc(item.mitigate)}</span></div>`:""}
@@ -1195,8 +1268,10 @@ window.addEventListener("hashchange",()=>{
 loadTheme();
 loadCollapsed();
 loadFavorites();
+loadSession();
 loadLocalCustoms();
 renderRail();
+renderSessionBar();
 renderList();
 if(!openFromHash()) showPlaceholder();   // deep-link to #id, else show the welcome screen
 tryReconnectFile();
