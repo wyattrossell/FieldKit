@@ -1,14 +1,14 @@
 /* FieldKit library validator.
    Run: node validate.js   (also runs in CI on every PR)
-   Loads .library-data.js and asserts the schema, unique ids, non-empty code,
+   Loads library-data.js and asserts the schema, unique ids, non-empty code,
    a controlled tag vocabulary, and the purple-team rule (red/purple entries
    must carry an ATT&CK id and a detect line). Exits non-zero on any error. */
 
 const path = require("path");
 
-// .library-data.js sets window.FIELDKIT_LIBRARY
+// library-data.js sets window.FIELDKIT_LIBRARY
 global.window = {};
-require(path.join(__dirname, ".library-data.js"));
+require(path.join(__dirname, "library-data.js"));
 const LIB = global.window.FIELDKIT_LIBRARY;
 
 const CODE_KEYS    = ["ps", "cmd", "mac", "linux", "py", "dork", "sql"];

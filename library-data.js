@@ -1,5 +1,5 @@
 /* FieldKit — command library data.
-   Loaded by FieldKit.html via <script src=".library-data.js">, which works from
+   Loaded by FieldKit.html via <script src="library-data.js">, which works from
    file:// (a fetched .json would be blocked). Sets window.FIELDKIT_LIBRARY.
    Schema + how to add entries: see CONTRIBUTING.md. */
 window.FIELDKIT_LIBRARY = [
