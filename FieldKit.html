@@ -238,6 +238,20 @@
   .rb-add{font-family:var(--mono); font-size:10.5px; color:var(--teal); background:transparent; border:1px solid var(--edge); border-radius:5px; padding:3px 9px; cursor:pointer}
   .rb-add:hover{color:var(--ink); border-color:var(--teal)}
   .rb-add.ok{color:var(--green); border-color:#3a5c33}
+  /* ATT&CK coverage modal */
+  .atkmodal{width:min(680px,100%)}
+  .atk-summary{font-family:var(--mono); font-size:12px; color:var(--muted); margin:14px 0 10px}
+  .atk-sec{font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--faint); margin:14px 0 6px}
+  .atk-list{border:1px solid var(--edge); border-radius:8px; max-height:34vh; overflow-y:auto}
+  .atk-row{display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge); cursor:pointer; width:100%; text-align:left; background:transparent}
+  .atk-row:last-child{border-bottom:0}
+  .atk-row:hover{background:var(--panel2)}
+  .atk-id{font-family:var(--mono); font-size:12.5px; color:var(--teal); width:88px; flex:none}
+  .atk-count{font-family:var(--mono); font-size:11px; color:var(--muted); flex:1}
+  .atk-cov{font-family:var(--mono); font-size:11px}
+  .atk-cov.ok{color:var(--green)} .atk-cov.gap{color:var(--red)}
+  .atk-ext{color:var(--faint); text-decoration:none; font-size:13px; padding:0 4px}
+  .atk-ext:hover{color:var(--teal)}
   /* runbook modal */
   .rbmodal{width:min(700px,100%)}
   .rb-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px}
@@ -425,6 +439,7 @@
     <option value="contrast">High Contrast</option>
     <option value="green">Terminal Green</option>
   </select>
+  <button class="toolbtn" id="attackBtn" title="ATT&amp;CK technique coverage & detection gaps">⚔ ATT&amp;CK</button>
   <button class="toolbtn" id="runbookBtn" title="Build ordered runbooks and export them as a script">▶ Runbooks</button>
   <button class="toolbtn" id="addBtn">+ Add</button>
   <select class="toolbtn" id="dataMenu" title="Save / load / import / export your data">
@@ -448,6 +463,18 @@
 
 <footer class="foot">⚠ Authorized use &amp; education only — you are responsible for legal compliance.</footer>
 <div class="printonly printfoot">Printed from FieldKit — an offline command reference. ⚠ Authorized use &amp; education only; you are responsible for legal compliance. Verify commands before running.</div>
+
+<!-- ATT&CK coverage modal -->
+<div class="scrim" id="atkScrim">
+  <div class="modal atkmodal" role="dialog" aria-modal="true" aria-label="ATT&amp;CK coverage">
+    <div class="rb-head">
+      <h3>⚔ ATT&amp;CK coverage</h3>
+      <button class="btn ghost" id="atk-close">Close</button>
+    </div>
+    <p class="sub">MITRE ATT&amp;CK techniques referenced in the library, and whether any entry provides a <b>Detect</b> line. Click a technique to see its entries.</p>
+    <div id="atk-body"></div>
+  </div>
+</div>
 
 <!-- runbooks modal -->
 <div class="scrim" id="rbScrim">
@@ -864,6 +891,40 @@ function wireRunbookAdd(item){
   b.onclick=()=>{ const added=addToRunbook(item.id); b.textContent = added ? `Added to “${activeRunbook}” ✓` : "Already in this runbook"; b.classList.toggle("ok",added); updateRunbookCount(); setTimeout(()=>{ b.textContent="＋ Add to runbook"; b.classList.remove("ok"); },1700); };
 }
 
+// ---- ATT&CK coverage dashboard ----
+function attackUrl(t){ return `https://attack.mitre.org/techniques/${String(t).replace('.','/')}/`; }  // ids are safe chars; don't encode the sub-technique slash
+function attackCoverage(){
+  const map={};
+  library.forEach(e=>{ (e.attack||[]).forEach(t=>{ if(!/^T\d{4}(\.\d{3})?$/.test(t)) return; if(!map[t]) map[t]={count:0,detect:0}; map[t].count++; if(e.detect) map[t].detect++; }); });
+  return map;
+}
+function openAttack(){ renderAttackModal(); $("#atkScrim").classList.add("open"); }
+function closeAttack(){ $("#atkScrim").classList.remove("open"); }
+function renderAttackModal(){
+  const box=$("#atk-body"); if(!box) return;
+  const map=attackCoverage();
+  const ids=Object.keys(map).sort();
+  const gaps=ids.filter(t=>map[t].detect===0);
+  const covered=ids.filter(t=>map[t].detect>0);
+  const entriesTotal=library.filter(e=>e.attack&&e.attack.length).length;
+  const row=t=>`<div class="atk-row" data-t="${t}" role="button" tabindex="0" aria-label="${esc(t)}, ${map[t].count} entries, ${map[t].detect?'covered':'no detection'}">
+      <span class="atk-id">${esc(t)}</span>
+      <span class="atk-count">${map[t].count} entr${map[t].count===1?"y":"ies"}</span>
+      <span class="atk-cov ${map[t].detect?'ok':'gap'}">${map[t].detect?`✓ ${map[t].detect} with detect`:'✗ no detection'}</span>
+      <a class="atk-ext" href="${attackUrl(t)}" target="_blank" rel="noopener" aria-label="Open ${esc(t)} on attack.mitre.org">↗</a>
+    </div>`;
+  box.innerHTML=
+    `<div class="atk-summary"><b>${ids.length}</b> techniques across ${entriesTotal} entries · <span class="atk-cov ok">${covered.length} with detection</span> · <span class="atk-cov gap">${gaps.length} gaps</span></div>`
+    + (gaps.length?`<div class="atk-sec">Detection gaps — technique present, but no entry provides a Detect line</div><div class="atk-list">${gaps.map(row).join("")}</div>`:`<div class="atk-sec">No detection gaps 🎉</div>`)
+    + `<div class="atk-sec">Covered (${covered.length})</div><div class="atk-list">${covered.map(row).join("")}</div>`;
+  box.querySelectorAll(".atk-row").forEach(el=>{
+    const go=()=>{ const t=el.dataset.t; const q=$("#q"); if(q) q.value=t; query=t.toLowerCase(); tagsExpanded=false; renderTagBar(); renderList(); closeAttack(); };
+    el.onclick=e=>{ if(e.target.closest(".atk-ext")) return; go(); };
+    el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } };
+  });
+  box.querySelectorAll(".atk-ext").forEach(a=>a.onclick=e=>e.stopPropagation());
+}
+
 function renderList(){
   closeCopyViewPicker();
   let items=library.filter(matches);
@@ -968,7 +1029,7 @@ function fillTemplate(text, values){
 function teamBadge(item){ return item.team ? `<span class="team ${esc(item.team)}">${esc(item.team)}</span>` : ""; }
 function attackBadges(item){
   return (item.attack||[]).map(t=>
-    `<a class="att" href="https://attack.mitre.org/techniques/${encodeURIComponent(String(t).replace('.','/'))}/" target="_blank" rel="noopener">${esc(t)}</a>`
+    `<a class="att" href="${attackUrl(t)}" target="_blank" rel="noopener">${esc(t)}</a>`
   ).join("");
 }
 function tagChips(item){
@@ -1350,7 +1411,10 @@ $("#teamfilter").querySelectorAll("button").forEach(b=>{
 $("#themeSel").onchange=e=>applyTheme(e.target.value);
 $("#osDetectBtn").onclick=()=>{ osDetect=!osDetect; try{ localStorage.setItem(OSDETECT_KEY, osDetect?"1":"0"); }catch(e){} applyOsDetectBtn(); if(selectedId) select(selectedId); };
 
-/* ---------- runbooks wiring ---------- */
+/* ---------- ATT&CK + runbooks wiring ---------- */
+$("#attackBtn").onclick=openAttack;
+$("#atk-close").onclick=closeAttack;
+$("#atkScrim").onclick=e=>{ if(e.target===$("#atkScrim")) closeAttack(); };
 $("#runbookBtn").onclick=openRunbooks;
 $("#rb-close").onclick=closeRunbooks;
 $("#rbScrim").onclick=e=>{ if(e.target===$("#rbScrim")) closeRunbooks(); };
@@ -1498,6 +1562,7 @@ async function tryReconnectFile(){
 document.addEventListener("keydown", e=>{
   const tag=(e.target.tagName||"").toLowerCase();
   const typing = tag==="input"||tag==="textarea"||tag==="select";
+  if($("#atkScrim").classList.contains("open")){ if(e.key==="Escape") closeAttack(); return; }
   if($("#rbScrim").classList.contains("open")){ if(e.key==="Escape") closeRunbooks(); return; }
   if(scrim.classList.contains("open")){ if(e.key==="Escape") closeModal(); return; }
   if(e.key==="/" && !typing){ e.preventDefault(); $("#q").focus(); return; }
