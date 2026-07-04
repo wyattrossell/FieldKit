@@ -45,5 +45,12 @@ fs.mkdirSync(distDir, { recursive: true });
 fs.writeFileSync(path.join(distDir, "FieldKit.html"), inlined);
 fs.writeFileSync(path.join(distDir, "index.html"), inlined); // GitHub Pages entry point
 
+// PWA assets — used by the hosted demo (installable / offline). The downloaded
+// single file works fine without them (SW is guarded to http(s); manifest is optional).
+for (const f of ["manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png"]) {
+  try { fs.copyFileSync(path.join(ROOT, f), path.join(distDir, f)); }
+  catch (e) { console.warn(`build: PWA asset missing (${f}) — skipped`); }
+}
+
 const kb = (Buffer.byteLength(inlined) / 1024).toFixed(0);
-console.log(`build: wrote dist/FieldKit.html and dist/index.html (${kb} KB, single self-contained file)`);
+console.log(`build: wrote dist/FieldKit.html + dist/index.html (${kb} KB) and PWA assets`);

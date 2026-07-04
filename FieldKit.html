@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FieldKit — Portable Script Library</title>
+<meta name="theme-color" content="#12161b">
+<meta name="description" content="Offline, purple-team command reference for blue/red teams, sysadmins, and students.">
+<!-- Inline SVG favicon: works even in the single-file build (no sibling needed) -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23e3a83f'/%3E%3Cg fill='none' stroke='%2312161b' stroke-width='36' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='152,168 240,256 152,344'/%3E%3Cline x1='272' y1='352' x2='378' y2='352'/%3E%3C/g%3E%3C/svg%3E">
+<!-- PWA manifest (hosted demo only; harmlessly absent in the downloaded single file) -->
+<link rel="manifest" href="manifest.webmanifest">
 <style>
   :root{
     --bg:#12161b; --panel:#1a1f27; --panel2:#20262f; --edge:#2f3743; --edge2:#3c4654;
@@ -1600,6 +1606,11 @@ applyOsDetectBtn();
 renderList();
 if(!openFromHash()) showPlaceholder();   // deep-link to #id, else show the welcome screen
 tryReconnectFile();
+
+// PWA: register the service worker only when hosted over http(s); never on file://
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
 </script>
 </body>
 </html>
