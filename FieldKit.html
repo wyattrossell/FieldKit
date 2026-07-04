@@ -79,6 +79,7 @@
     background:var(--bg); border:1px solid var(--edge); padding:7px 11px; border-radius:6px; cursor:pointer;
   }
   .toolbtn:hover{color:var(--ink); border-color:var(--edge2)}
+  .ostoggle.on{color:var(--amber); border-color:var(--amber-dim); background:var(--panel2)}
   /* ---------- body ---------- */
   main{flex:1; display:grid; grid-template-columns:190px 340px 1fr; min-height:0}
   .rail{border-right:1px solid var(--edge); background:var(--panel); overflow-y:auto; padding:10px 0}
@@ -410,6 +411,7 @@
     <button data-l="linux">LINUX</button>
     <button data-l="py">PY</button>
   </div>
+  <button class="toolbtn ostoggle" id="osDetectBtn" title="When on, each command opens on your OS's shell tab" aria-pressed="true">⌖ OS</button>
   <div class="langfilter teamfilter" id="teamfilter" title="Filter by team">
     <button data-tm="all" class="on">ALL</button>
     <button data-tm="blue"><span class="teamdot blue"></span>BLUE</button>
@@ -512,6 +514,18 @@ let library = BUILTIN.map(x=>({...x}));
 let activeCat = "All";
 let activeLangFilter = "all";
 let activeTeam = "all";
+const OSDETECT_KEY = "fieldkit.osdetect.v1";
+let osDetect = true;   // default the language tab to the visitor's OS (toggleable)
+function loadOsDetect(){ try{ const v=localStorage.getItem(OSDETECT_KEY); osDetect = (v===null) ? true : v==="1"; }catch(e){ osDetect=true; } }
+function detectOSLang(){
+  let p=""; try{ p=(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||navigator.userAgent||""; }catch(e){}
+  const s=String(p).toLowerCase();
+  if(s.includes("win")) return "ps";
+  if(s.includes("mac")||s.includes("iphone")||s.includes("ipad")) return "mac";
+  if(s.includes("linux")||s.includes("android")||s.includes("x11")) return "linux";
+  return null;
+}
+function applyOsDetectBtn(){ const b=$("#osDetectBtn"); if(b){ b.classList.toggle("on", osDetect); b.setAttribute("aria-pressed", osDetect?"true":"false"); } }
 let query = "";
 let selectedId = null;
 let selectedLang = null;
@@ -897,8 +911,11 @@ function select(id){
   if(!item) return;
   selectedId=id;
   const avail=langsOf(item);
-  // honor the global language filter if that language exists here
-  selectedLang = (activeLangFilter!=="all" && item.code && item.code[activeLangFilter]) ? activeLangFilter : avail[0];
+  // 1) honor the global language filter, else 2) the visitor's OS (if OS-detect on), else first available
+  const osl = osDetect ? detectOSLang() : null;
+  selectedLang = (activeLangFilter!=="all" && item.code && item.code[activeLangFilter]) ? activeLangFilter
+               : (osl && item.code && item.code[osl]) ? osl
+               : avail[0];
   try{ history.replaceState(null,"","#"+encodeURIComponent(id)); }catch(e){ try{ location.hash=id; }catch(_){} }
   renderList();
   renderDetail();
@@ -1331,6 +1348,7 @@ $("#teamfilter").querySelectorAll("button").forEach(b=>{
   };
 });
 $("#themeSel").onchange=e=>applyTheme(e.target.value);
+$("#osDetectBtn").onclick=()=>{ osDetect=!osDetect; try{ localStorage.setItem(OSDETECT_KEY, osDetect?"1":"0"); }catch(e){} applyOsDetectBtn(); if(selectedId) select(selectedId); };
 
 /* ---------- runbooks wiring ---------- */
 $("#runbookBtn").onclick=openRunbooks;
@@ -1505,6 +1523,7 @@ window.addEventListener("hashchange",()=>{
 /* ---------- boot ---------- */
 loadTheme();
 loadCollapsed();
+loadOsDetect();
 loadFavorites();
 loadSession();
 loadRunbooks();
@@ -1512,6 +1531,7 @@ loadLocalCustoms();
 renderRail();
 renderSessionBar();
 updateRunbookCount();
+applyOsDetectBtn();
 renderList();
 if(!openFromHash()) showPlaceholder();   // deep-link to #id, else show the welcome screen
 tryReconnectFile();
