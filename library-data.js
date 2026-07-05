@@ -1624,7 +1624,8 @@ for i in range(len(letters)):
     print()               # newline after each row`}},
 
 {id:"py-cond-bool", cat:"Python Examples", title:"Conditionals · Boolean values and expressions",
- desc:"Comparisons produce True/False of type bool.",
+ level:"beginner", example_output:"True\nFalse\nTrue\nTrue\n<class 'bool'>",
+ desc:"Comparison operators (>, <, ==, !=, >=, <=) evaluate to a Boolean — either True or False, both of type bool. These are the yes/no answers your program branches on. Note that == tests equality (two equals signs) while a single = assigns; mixing them up is a classic beginner slip.",
  code:{py:`print(5 > 3)        # True
 print(5 == 3)       # False
 print(5 != 3)       # True
@@ -1632,14 +1633,16 @@ x = 10
 print(x >= 10)      # True
 print(type(True))   # <class 'bool'>`}},
 {id:"py-cond-logical", cat:"Python Examples", title:"Conditionals · Logical operators (and/or/not)",
- desc:"Combine booleans with and, or, not.",
+ level:"beginner", example_output:"False\nTrue\nFalse\nTrue",
+ desc:"and, or, and not combine Boolean values into a single answer. 'a and b' is True only when both are; 'a or b' is True when at least one is; 'not a' flips the value. They let one if-test capture a compound condition, like age > 18 and age < 65 for 'an adult under 65'.",
  code:{py:`print(True and False)   # False  (both must be true)
 print(True or False)    # True   (either)
 print(not True)         # False
 age = 25
 print(age > 18 and age < 65)   # True`}},
 {id:"py-cond-shortcircuit", cat:"Python Examples", title:"Conditionals · Short-circuit evaluation",
- desc:"'and' stops at the first False, 'or' at the first True — the rest is skipped.",
+ level:"beginner", example_output:"False\nTrue\nFalse",
+ desc:"Python evaluates and/or left to right and stops the moment the result is known: 'and' short-circuits at the first False, 'or' at the first True, so the rest never runs. Beyond speed this is a safety tool — 'x != 0 and 10/x > 1' skips the division when x is 0, dodging a ZeroDivisionError. Put the cheap or protective check first.",
  code:{py:`def loud():
     print("evaluated!")
     return True
@@ -1649,31 +1652,36 @@ print(True or loud())     # loud() never runs -> True
 x = 0
 print(x != 0 and (10 / x) > 1)   # right side skipped, no ZeroDivisionError`}},
 {id:"py-cond-in", cat:"Python Examples", title:"Conditionals · in and not in operators",
- desc:"Test membership in a sequence or dict.",
+ level:"beginner", example_output:"True\nTrue\nTrue\nTrue",
+ desc:"The in operator asks 'is this value present?' and returns a Boolean — it works on strings (substring test), lists and tuples (element test), and dicts (where it checks the keys). 'not in' is its negation. It's the clean, readable way to test membership instead of writing a loop yourself.",
  code:{py:`print("a" in "cat")            # True
 print(3 in [1, 2, 3])          # True
 print("z" not in "cat")        # True
 print("key" in {"key": 1})     # True (checks dict keys)`}},
 {id:"py-cond-precedence", cat:"Python Examples", title:"Conditionals · Operator precedence",
- desc:"Arithmetic, then comparisons, then not, and, or.",
+ level:"beginner", example_output:"True\nTrue\nFalse",
+ desc:"When arithmetic, comparison, and logical operators mix, Python resolves them in that order: arithmetic first, then comparisons, then not, then and, then or. So 2 + 3 == 5 compares 5 to 5, and 'True or False and False' groups as 'True or (False and False)'. When a compound test isn't obviously grouped, add parentheses.",
  code:{py:`print(2 + 3 == 5)              # True  (arithmetic before ==)
 print(True or False and False) # True  (and before or)
 print(not 5 > 3)               # False (> before not)`}},
 {id:"py-cond-ifelse", cat:"Python Examples", title:"Conditionals · Binary selection (if/else)",
- desc:"Choose between exactly two paths.",
+ level:"beginner", example_output:"odd",
+ desc:"if/else picks exactly one of two paths: the if-block runs when the condition is True, otherwise the else-block runs — never both. The condition is any expression Python reads as truthy or falsy. Here n % 2 checks the remainder to decide even vs odd, a tiny but extremely common test.",
  code:{py:`n = 7
 if n % 2 == 0:
     print("even")
 else:
     print("odd")`}},
 {id:"py-cond-if", cat:"Python Examples", title:"Conditionals · Unary selection (if only)",
- desc:"Run a block only when a condition is true.",
+ level:"beginner", example_output:"It's hot!\ndone",
+ desc:"A bare if runs its block only when the condition is True and simply skips it otherwise — there's no alternative branch. Code after the if (back at the outer indentation) runs either way. Use it for optional actions: warn if a value is out of range, add a note if a flag is set.",
  code:{py:`temp = 95
 if temp > 90:
     print("It's hot!")     # runs only when condition is True
 print("done")              # always runs`}},
 {id:"py-cond-nested", cat:"Python Examples", title:"Conditionals · Nested conditionals",
- desc:"An if inside another if.",
+ level:"beginner", example_output:"positive",
+ desc:"Conditionals can nest: an if or else block can contain another if. The inner test is reached only once the outer one is decided, letting you narrow down in stages — here first 'is it non-negative?', then 'zero or positive?'. Deep nesting gets hard to read, so once you're three levels in, consider elif or moving logic into a function.",
  code:{py:`x = 5
 if x >= 0:
     if x == 0:
@@ -1683,7 +1691,8 @@ if x >= 0:
 else:
     print("negative")`}},
 {id:"py-cond-elif", cat:"Python Examples", title:"Conditionals · Chained conditionals (elif)",
- desc:"Test several conditions in order; the first true one wins.",
+ level:"beginner", example_output:"B",
+ desc:"elif chains several conditions tested top to bottom; the first True one runs, the rest are skipped, and an optional else catches whatever is left. This is the clean way to map ranges to categories (a grade from a score) — far tidier than nested if/else. Order matters: put the most specific or highest thresholds first.",
  code:{py:`score = 82
 if score >= 90:
     grade = "A"
@@ -1695,7 +1704,8 @@ else:
     grade = "F"
 print(grade)      # B`}},
 {id:"py-cond-accum-max", cat:"Python Examples", title:"Conditionals · Accumulator with conditionals (max)",
- desc:"Track a running best value with a conditional update.",
+ level:"beginner", example_output:"max: 74",
+ desc:"To find the largest (or smallest) value yourself, combine the accumulator pattern with a conditional: seed 'biggest' with the first item, then on each pass update it only when you meet something larger. It's exactly what the built-in max() does under the hood — worth writing once by hand to understand, then reaching for max()/min() in real code.",
  code:{py:`nums = [3, 41, 12, 9, 74, 15]
 biggest = nums[0]              # start with the first
 for n in nums:
