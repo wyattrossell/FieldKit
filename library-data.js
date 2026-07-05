@@ -2371,13 +2371,15 @@ except ValueError as e:
 # ZeroDivisionError, ValueError, IndexError, NameError`}},
 
 {id:"py-cls-define", cat:"Python Examples", title:"Classes · User-defined classes",
- desc:"class defines a new type; () creates an instance.",
+ level:"intermediate", example_output:"<class '__main__.Dog'>",
+ desc:"A class defines a brand-new type — a blueprint for objects that bundle data and behaviour together. Writing 'class Dog:' creates the type, and calling it like a function, Dog(), makes an instance. Even this empty class is a real type: type(d) reports it. Classes let you model the 'things' in your program (a Dog, an Account, a Point) instead of juggling loose variables.",
  code:{py:`class Dog:
     pass              # an empty class (a new type)
 d = Dog()             # create an instance
 print(type(d))        # <class '__main__.Dog'>`}},
 {id:"py-cls-init", cat:"Python Examples", title:"Classes · Constructor / parameters (init)",
- desc:"__init__ runs at creation and sets instance attributes.",
+ level:"intermediate", example_output:"3 4",
+ desc:"__init__ is the constructor — Python runs it automatically when you create an instance, and its job is to set up that object's initial data. The first parameter, self, is the new instance; assigning self.x = x stores a value on it. So Point(3, 4) calls __init__ with x=3, y=4, giving each Point its own x and y. Almost every useful class starts with an __init__.",
  code:{py:`class Point:
     def __init__(self, x, y):   # runs when you create an instance
         self.x = x
@@ -2385,7 +2387,8 @@ print(type(d))        # <class '__main__.Dog'>`}},
 p = Point(3, 4)
 print(p.x, p.y)                 # 3 4`}},
 {id:"py-cls-methods", cat:"Python Examples", title:"Classes · Adding methods",
- desc:"Methods take self and act on the instance.",
+ level:"intermediate", example_output:"12.56636",
+ desc:"A method is a function defined inside a class; it always takes self first — the instance it's called on — so c.area() runs area with self = c and can read c's data (self.r). Methods are how objects act on their own state. You write the self parameter in the definition, but don't pass it explicitly; Python supplies whatever is before the dot.",
  code:{py:`class Circle:
     def __init__(self, r):
         self.r = r
@@ -2394,7 +2397,8 @@ print(p.x, p.y)                 # 3 4`}},
 c = Circle(2)
 print(c.area())                 # 12.566...`}},
 {id:"py-cls-obj-args", cat:"Python Examples", title:"Classes · Objects as arguments/parameters",
- desc:"Pass instances into functions like any other value.",
+ level:"intermediate", example_output:"5.0",
+ desc:"Instances are ordinary values, so you can pass them into functions, store them in lists, and return them — just like ints or strings. Here distance takes two Point objects and reads their attributes to compute the result. This is a key benefit of classes: one object carries all its related data, so you pass a single thing around instead of many loose variables.",
  code:{py:`class Point:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -2402,7 +2406,8 @@ def distance(a, b):
     return ((a.x - b.x)**2 + (a.y - b.y)**2) ** 0.5
 print(distance(Point(0, 0), Point(3, 4)))   # 5.0`}},
 {id:"py-cls-str", cat:"Python Examples", title:"Classes · Converting an object to a string (str)",
- desc:"__str__ controls how print() / str() show the object.",
+ level:"intermediate", example_output:"(3, 4)",
+ desc:"By default, printing an object shows something unhelpful like <__main__.Point object at 0x...>. Defining __str__ controls the human-readable form: print() and str() call it, so a Point can display as (3, 4). It must return a string. (Its cousin __repr__ gives the developer-facing form used at the prompt and inside containers; define it too for good debugging output.)",
  code:{py:`class Point:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -2410,7 +2415,8 @@ print(distance(Point(0, 0), Point(3, 4)))   # 5.0`}},
         return f"({self.x}, {self.y})"
 print(Point(3, 4))                     # (3, 4)`}},
 {id:"py-cls-return-instance", cat:"Python Examples", title:"Classes · Instances as return values",
- desc:"A function can build and return a new object.",
+ level:"intermediate", example_output:"(2.0, 3.0)",
+ desc:"A function or method can build and return a new object — midpoint constructs a fresh Point from two others and hands it back. This is common with 'value' types: operations produce new instances rather than mutating existing ones. Because Point defines __str__, the returned object prints nicely. Returning objects lets you chain and compose operations naturally.",
  code:{py:`class Point:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -2420,7 +2426,8 @@ def midpoint(a, b):
     return Point((a.x + b.x) / 2, (a.y + b.y) / 2)
 print(midpoint(Point(0, 0), Point(4, 6)))   # (2.0, 3.0)`}},
 {id:"py-cls-sort-instances", cat:"Python Examples", title:"Classes · Sorting lists of instances",
- desc:"Sort objects with a key function on an attribute.",
+ level:"intermediate", example_output:"[Ana(30), Sam(42)]",
+ desc:"To sort a list of objects, give sorted() a key that pulls the attribute to compare — key=lambda p: p.age sorts people by age. The objects aren't changed, only ordered. Defining __repr__ makes the printed list readable (Ana(30) instead of an address). For repeated sorting, operator.attrgetter('age') is a faster, clearer key.",
  code:{py:`class Person:
     def __init__(self, name, age):
         self.name, self.age = name, age
@@ -2429,7 +2436,8 @@ print(midpoint(Point(0, 0), Point(4, 6)))   # (2.0, 3.0)`}},
 people = [Person("Sam", 42), Person("Ana", 30)]
 print(sorted(people, key=lambda p: p.age))    # by age`}},
 {id:"py-cls-class-vs-instance", cat:"Python Examples", title:"Classes · Class variables vs. instance variables",
- desc:"Class variables are shared; instance variables are per object.",
+ level:"intermediate", example_output:"Canis familiaris Canis familiaris\nRex Fido",
+ desc:"A class variable is defined in the class body and shared by every instance (all Dogs have the same species). An instance variable is assigned on self (usually in __init__) and is unique to each object (each Dog has its own name). You read them the same way, but note: assigning through an instance creates an instance variable that shadows the class one rather than changing the shared value.",
  code:{py:`class Dog:
     species = "Canis familiaris"     # class variable (shared)
     def __init__(self, name):
@@ -2438,7 +2446,8 @@ a, b = Dog("Rex"), Dog("Fido")
 print(a.species, b.species)          # shared value
 print(a.name, b.name)                # different`}},
 {id:"py-cls-private", cat:"Python Examples", title:"Classes · Public and private instance variables",
- desc:"A leading underscore marks an attribute as internal (by convention).",
+ level:"intermediate", example_output:"150",
+ desc:"Python has no truly private attributes — instead there's a convention. A single leading underscore (self._balance) signals 'internal; don't touch from outside', while plain names are public API. Nothing enforces it, but well-behaved code respects it, working through methods like deposit() rather than poking _balance directly. (A double underscore triggers name-mangling, a stronger but rarely-needed measure.)",
  code:{py:`class Account:
     def __init__(self, balance):
         self.owner = "Sam"       # public by convention
@@ -2449,7 +2458,8 @@ print(a.name, b.name)                # different`}},
 acct = Account(100)
 print(acct.deposit(50))          # 150`}},
 {id:"py-cls-test", cat:"Python Examples", title:"Classes · Testing classes",
- desc:"Assert initial state, method returns, and state changes.",
+ level:"intermediate", example_output:"class tests passed",
+ desc:"Testing a class means checking three things: its initial state after construction (c.n == 0), what its methods return (c.bump() == 1), and how they change state (c.n becomes 1). Create an instance, then assert your way through a small scenario. This arrange-act-assert flow scales up to real frameworks like unittest and pytest, which organize many such checks.",
  code:{py:`class Counter:
     def __init__(self):
         self.n = 0
@@ -2462,7 +2472,8 @@ assert c.bump() == 1             # method return
 assert c.n == 1                  # state changed
 print("class tests passed")`}},
 {id:"py-cls-decorator", cat:"Python Examples", title:"Classes · Class decorators (property/staticmethod)",
- desc:"@property exposes a method like an attribute; @staticmethod drops self.",
+ level:"advanced", example_output:"212.0 0",
+ desc:"Decorators customize how methods behave. @property turns a method into a computed attribute — you read t.fahrenheit with no parentheses and it runs the method behind the scenes (great for derived values). @staticmethod defines a function that lives on the class but takes no self, for class-related utilities that don't need an instance (Temp.freezing()). Both make a class's interface cleaner.",
  code:{py:`class Temp:
     def __init__(self, c):
         self._c = c
