@@ -2672,28 +2672,28 @@ FROM t1 A
 INNER JOIN t1 B ON condition;`}},
 
 /* ---------- set operators & predicates ---------- */
-{id:"sql-union", cat:"SQL", title:"UNION [ALL]", desc:"Stack rows of two queries (matching column count/types). UNION removes duplicates; UNION ALL keeps them.",
+{id:"sql-union", cat:"SQL", title:"UNION [ALL]", level:"intermediate", example_output:"-- SELECT name FROM ny  UNION  SELECT name FROM sf\nname\nAda\nSam\nLee\n-- Ada was in both; UNION kept one row, UNION ALL would keep two", desc:"UNION stacks the rows of two SELECTs into one result set (vertically), unlike a JOIN which combines columns (horizontally). Both queries must return the same number of columns with compatible types, and the column names come from the first query. Plain UNION removes duplicate rows (an extra sort/hash cost); UNION ALL keeps every row and is faster — use it when you know there are no duplicates or you want to keep them.",
  code:{sql:`SELECT c1, c2 FROM t1
 UNION [ALL]
 SELECT c1, c2 FROM t2;`}},
-{id:"sql-intersect", cat:"SQL", title:"INTERSECT", desc:"Rows present in both result sets.",
+{id:"sql-intersect", cat:"SQL", title:"INTERSECT", level:"intermediate", example_output:"-- customers who are ALSO employees\nname\nAda\n-- only rows present in both queries survive", desc:"INTERSECT returns only the rows that appear in both query results — the overlap of two sets. Like UNION, the two SELECTs must be column-compatible, and duplicates are removed. It answers 'which values are in both lists?'. Dialect note: some databases (older MySQL) have no INTERSECT, so you emulate it with an INNER JOIN or WHERE ... IN (subquery).",
  code:{sql:`SELECT c1, c2 FROM t1
 INTERSECT
 SELECT c1, c2 FROM t2;`}},
-{id:"sql-minus", cat:"SQL", title:"MINUS / EXCEPT", desc:"Rows in the first query but not the second. MINUS is Oracle; PostgreSQL/SQL Server/SQLite use EXCEPT.",
+{id:"sql-minus", cat:"SQL", title:"MINUS / EXCEPT", level:"intermediate", example_output:"-- employees who are NOT managers\nname\nSam\nLee\n-- rows of query 1 that had any match in query 2 are removed", desc:"EXCEPT (called MINUS in Oracle) returns the rows from the first query that are not in the second — set subtraction. Column-compatible SELECTs, duplicates removed. It answers 'what's in A but not in B?', such as customers who never placed an order. Dialect note: write EXCEPT on PostgreSQL/SQL Server/SQLite and MINUS on Oracle; MySQL lacks both and is emulated with a LEFT JOIN ... WHERE right IS NULL.",
  code:{sql:`SELECT c1, c2 FROM t1
 MINUS            -- EXCEPT in most databases
 SELECT c1, c2 FROM t2;`}},
-{id:"sql-like", cat:"SQL", title:"LIKE (pattern match)", desc:"Wildcard match: % = any run of characters, _ = exactly one character.",
+{id:"sql-like", cat:"SQL", title:"LIKE (pattern match)", level:"beginner", example_output:"-- WHERE name LIKE 'A%'   (names starting with A)\nname\nAda\nAmir", desc:"LIKE filters text by pattern using two wildcards: % matches any run of characters (including none) and _ matches exactly one. So 'a%' means starts-with-a, '%son' ends-with-son, and '%mit%' contains-mit. Matching is case-insensitive in some engines (MySQL) and case-sensitive in others (PostgreSQL, where ILIKE forces case-insensitive). Use NOT LIKE to invert, and an ESCAPE clause when you need to match a literal % or _.",
  code:{sql:`SELECT c1, c2 FROM t
 WHERE c1 LIKE 'a%';   -- starts with a ; use NOT LIKE to negate`}},
-{id:"sql-in", cat:"SQL", title:"IN (value list)", desc:"Match any value in a list (or a subquery).",
+{id:"sql-in", cat:"SQL", title:"IN (value list)", level:"beginner", example_output:"-- WHERE dept_id IN (1, 3)\nname   dept_id\nAda    1\nLee    3", desc:"IN tests whether a value matches any item in a list (or the result of a subquery), a compact alternative to chaining OR conditions: 'dept_id IN (1, 2, 3)' equals 'dept_id = 1 OR dept_id = 2 OR dept_id = 3'. NOT IN excludes the listed values. One important gotcha: if the list or subquery contains a NULL, NOT IN can return no rows at all, because comparing with NULL is 'unknown' — prefer NOT EXISTS in that case.",
  code:{sql:`SELECT c1, c2 FROM t
 WHERE c1 IN (1, 2, 3);   -- NOT IN to exclude`}},
-{id:"sql-between", cat:"SQL", title:"BETWEEN (range)", desc:"Match values in an inclusive range: low <= c1 <= high.",
+{id:"sql-between", cat:"SQL", title:"BETWEEN (range)", level:"beginner", example_output:"-- WHERE salary BETWEEN 50000 AND 60000\nname   salary\nSam    55000\nLee    60000", desc:"BETWEEN low AND high tests whether a value falls in a range, and it is inclusive of both endpoints — 'salary BETWEEN 50000 AND 70000' includes exactly 50000 and 70000. It works for numbers, dates, and text ordering. Because it's inclusive, be careful with dates: BETWEEN '2024-01-01' AND '2024-01-31' can miss late-in-the-day timestamps on the 31st, so a half-open range (>= start AND < next-day) is often safer. NOT BETWEEN inverts it.",
  code:{sql:`SELECT c1, c2 FROM t
 WHERE c1 BETWEEN low AND high;`}},
-{id:"sql-isnull", cat:"SQL", title:"IS [NOT] NULL", desc:"Test for NULL — you cannot compare to NULL with = (NULL = NULL is unknown).",
+{id:"sql-isnull", cat:"SQL", title:"IS [NOT] NULL", level:"beginner", example_output:"-- WHERE dept_id IS NULL   (employees with no department)\nname\nLee", desc:"NULL means 'unknown or absent', and it does not equal anything — not even another NULL — so you can never test it with = or <>. Use IS NULL to find missing values and IS NOT NULL to find present ones. This is exactly why 'WHERE c = NULL' silently returns nothing and is a classic beginner bug. To substitute a fallback for NULLs in the output, wrap the column in COALESCE(c, default).",
  code:{sql:`SELECT c1, c2 FROM t
 WHERE c1 IS NULL;   -- or IS NOT NULL`}},
 
