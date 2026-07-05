@@ -1881,40 +1881,46 @@ with open("people.csv", "w", newline="") as f:
 print("wrote people.csv")`}},
 
 {id:"py-dict-intro", cat:"Python Examples", title:"Dictionaries · Dictionaries",
- desc:"Store key -> value pairs; look up by key.",
+ level:"beginner", example_output:"42\n{'Sam': 42, 'Ana': 30, 'Kim': 25}",
+ desc:"A dictionary maps keys to values — think of it as a lookup table where you fetch a value by its key rather than a numeric position. You index with the key (ages['Sam']), and assigning to a new key adds a pair. Keys must be unique and immutable (strings, numbers, tuples); values can be anything. Since Python 3.7 dicts keep insertion order.",
  code:{py:`ages = {"Sam": 42, "Ana": 30}
 print(ages["Sam"])        # 42
 ages["Kim"] = 25          # add a pair
 print(ages)`}},
 {id:"py-dict-ops", cat:"Python Examples", title:"Dictionaries · Dictionary operations",
- desc:"Add/update, delete, membership, and length.",
+ level:"beginner", example_output:"True\n2",
+ desc:"The core dictionary operations: assign to a key to add or update it (an existing key is overwritten), del d[key] removes a pair (KeyError if it's missing), the in operator tests whether a key is present, and len() counts the pairs. Lookup and membership are fast — dicts are built on hashing, so they don't slow down as they grow.",
  code:{py:`d = {"a": 1, "b": 2}
 d["c"] = 3            # add / update
 del d["a"]           # delete a key
 print("b" in d)      # True  (membership tests keys)
 print(len(d))        # 2`}},
 {id:"py-dict-methods", cat:"Python Examples", title:"Dictionaries · Dictionary methods",
- desc:"keys(), values(), items(), get().",
+ level:"beginner", example_output:"['a', 'b']\n[1, 2]\n[('a', 1), ('b', 2)]\n0",
+ desc:"These methods expose a dict's contents: keys() gives the keys, values() the values, and items() the (key, value) pairs — each as a live 'view' you can loop over or wrap in list(). get(key, default) looks a key up but returns the default instead of raising when it's missing. items() is the one you'll reach for most, to loop over keys and values together.",
  code:{py:`d = {"a": 1, "b": 2}
 print(list(d.keys()))     # ['a', 'b']
 print(list(d.values()))   # [1, 2]
 print(list(d.items()))    # [('a', 1), ('b', 2)]
 print(d.get("z", 0))      # 0 default`}},
 {id:"py-dict-iter", cat:"Python Examples", title:"Dictionaries · Iterating over dictionaries",
- desc:"Looping a dict yields keys; use items() for key+value.",
+ level:"beginner", example_output:"Sam 95\nAna 88\nSam: 95\nAna: 88",
+ desc:"Looping over a dict directly gives you its keys (for name in scores), which you can use to fetch each value. More often you want both at once — for that, iterate scores.items(), which unpacks into key and value each pass. Iteration follows insertion order, so the output is predictable.",
  code:{py:`scores = {"Sam": 95, "Ana": 88}
 for name in scores:                 # iterates keys
     print(name, scores[name])
 for name, score in scores.items():  # key and value
     print(f"{name}: {score}")`}},
 {id:"py-dict-get", cat:"Python Examples", title:"Dictionaries · Safely retrieving values (.get)",
- desc:".get() returns a default instead of raising KeyError.",
+ level:"beginner", example_output:"1\nNone\n0",
+ desc:"Indexing a missing key (d['z']) raises KeyError and stops the program. get() is the safe alternative: d.get('z') returns None when the key is absent, and d.get('z', 0) lets you supply your own default. This is invaluable when a key may or may not be there — and it's the trick behind counting with get(word, 0) + 1.",
  code:{py:`d = {"a": 1}
 print(d.get("a"))        # 1
 print(d.get("z"))        # None (no KeyError)
 print(d.get("z", 0))     # 0   supply a default`}},
 {id:"py-dict-alias-copy", cat:"Python Examples", title:"Dictionaries · Aliasing and copying",
- desc:"Assignment aliases; .copy() makes an independent dict.",
+ level:"beginner", example_output:"{'x': 1, 'y': 2}\n{'x': 1, 'y': 2}",
+ desc:"Dictionaries are mutable, so the same aliasing rules as lists apply: b = a makes b another name for the same dict, and changes through one show in the other. To get an independent dict, use a.copy() (or dict(a)); mutating the copy leaves the original alone. Like lists, copy() is shallow — nested mutable values are still shared.",
  code:{py:`a = {"x": 1}
 b = a                 # alias: same dict
 b["y"] = 2
@@ -1923,14 +1929,16 @@ c = a.copy()          # independent copy
 c["z"] = 9
 print(a)              # unchanged by c`}},
 {id:"py-dict-accum", cat:"Python Examples", title:"Dictionaries · Accumulating results in a dictionary",
- desc:"Tally counts using get() with a default.",
+ level:"beginner", example_output:"{'to': 2, 'be': 2, 'or': 1, 'not': 1}",
+ desc:"A dictionary is the natural home for tallies. Start with an empty dict, then for each item do counts[key] = counts.get(key, 0) + 1 — get() supplies 0 the first time a key is seen, so you never hit a KeyError. This word-frequency count is a classic; the same shape works for grouping and histograms. (collections.Counter does it in one line.)",
  code:{py:`text = "to be or not to be"
 counts = {}
 for word in text.split():
     counts[word] = counts.get(word, 0) + 1   # tally
 print(counts)     # {'to': 2, 'be': 2, 'or': 1, 'not': 1}`}},
 {id:"py-dict-best-key", cat:"Python Examples", title:"Dictionaries · Accumulating the best key",
- desc:"Scan a dict to find the key with the largest value.",
+ level:"beginner", example_output:"most common: to",
+ desc:"To find the key with the largest value, walk the dict tracking the best key so far and update only when you meet a strictly larger value. Starting best at None handles the first/empty case. Ties go to whichever key was seen first (insertion order). In practice max(counts, key=counts.get) does the same in one line, but the loop shows the logic.",
  code:{py:`counts = {"to": 2, "be": 2, "or": 1, "not": 1}
 best = None
 for word in counts:
