@@ -2643,30 +2643,30 @@ GROUP BY c1
 HAVING condition;`}},
 
 /* ---------- joining tables ---------- */
-{id:"sql-inner-join", cat:"SQL", title:"INNER JOIN", desc:"Rows that have a match in both tables.",
+{id:"sql-inner-join", cat:"SQL", title:"INNER JOIN", level:"intermediate", example_output:"-- employees JOIN departments ON employees.dept_id = departments.id\nname  department\nAda   Engineering\nSam   Operations", desc:"An INNER JOIN combines rows from two tables where the ON condition matches, returning only the pairs that have a counterpart on both sides — unmatched rows from either table are dropped. It's the default and most common join, used to follow a foreign key (an employee's dept_id to a department's id). Qualify column names (t1.c1) when both tables share one.",
  code:{sql:`SELECT c1, c2
 FROM t1
 INNER JOIN t2 ON condition;`}},
-{id:"sql-left-join", cat:"SQL", title:"LEFT JOIN", desc:"All rows from the left table, plus matches from the right (NULLs where none).",
+{id:"sql-left-join", cat:"SQL", title:"LEFT JOIN", level:"intermediate", example_output:"-- employees LEFT JOIN departments\nname  department\nAda   Engineering\nSam   Operations\nLee   NULL", desc:"A LEFT JOIN (LEFT OUTER JOIN) returns every row from the left table, attaching matching right-table columns where they exist and NULLs where they don't. Use it when the left side is the one you must keep — 'all employees, with their department if any'. A LEFT JOIN with WHERE right_col IS NULL is the classic way to find left rows that have no match.",
  code:{sql:`SELECT c1, c2
 FROM t1
 LEFT JOIN t2 ON condition;`}},
-{id:"sql-right-join", cat:"SQL", title:"RIGHT JOIN", desc:"All rows from the right table, plus matches from the left.",
+{id:"sql-right-join", cat:"SQL", title:"RIGHT JOIN", level:"intermediate", example_output:"-- employees RIGHT JOIN departments\nname  department\nAda   Engineering\nSam   Operations\nNULL  Sales", desc:"A RIGHT JOIN is the mirror of LEFT JOIN: it keeps every row from the right table and fills NULLs where the left has no match. It's less common because you can always rewrite it as a LEFT JOIN by swapping the table order, which many find easier to read. Here 'all departments, with employees where any' keeps Sales even though nobody works there.",
  code:{sql:`SELECT c1, c2
 FROM t1
 RIGHT JOIN t2 ON condition;`}},
-{id:"sql-full-join", cat:"SQL", title:"FULL OUTER JOIN", desc:"All rows from both tables, matched where possible. Note: MySQL has no FULL OUTER JOIN — emulate with LEFT JOIN UNION RIGHT JOIN.",
+{id:"sql-full-join", cat:"SQL", title:"FULL OUTER JOIN", level:"intermediate", example_output:"-- employees FULL OUTER JOIN departments\nname  department\nAda   Engineering\nSam   Operations\nLee   NULL\nNULL  Sales", desc:"A FULL OUTER JOIN keeps every row from both tables, pairing them where the condition matches and using NULLs on whichever side is missing — effectively LEFT and RIGHT combined. Use it to reconcile two sets and see everything, matched or not. Dialect note: MySQL has no FULL OUTER JOIN, so you emulate it with a LEFT JOIN UNION a RIGHT JOIN.",
  code:{sql:`SELECT c1, c2
 FROM t1
 FULL OUTER JOIN t2 ON condition;`}},
-{id:"sql-cross-join", cat:"SQL", title:"CROSS JOIN", desc:"Cartesian product: every row of t1 paired with every row of t2.",
+{id:"sql-cross-join", cat:"SQL", title:"CROSS JOIN", level:"intermediate", example_output:"-- 2 sizes CROSS JOIN 2 colours = 4 rows\nsize  colour\nS     red\nS     blue\nM     red\nM     blue", desc:"A CROSS JOIN produces the Cartesian product — every row of the first table paired with every row of the second, with no ON condition. The result has (rows of t1 x rows of t2) rows, which explodes fast, so it's rarely wanted by accident. Legitimate uses include generating all combinations (sizes x colours) or building a grid of dates.",
  code:{sql:`SELECT c1, c2
 FROM t1
 CROSS JOIN t2;`}},
-{id:"sql-cross-join2", cat:"SQL", title:"Implicit cross join (comma)", desc:"Comma-separated tables also cross join; add a WHERE to turn it into an equi-join.",
+{id:"sql-cross-join2", cat:"SQL", title:"Implicit cross join (comma)", level:"intermediate", example_output:"-- FROM employees e, departments d WHERE e.dept_id = d.id\n-- (same result as an INNER JOIN)\nname  department\nAda   Engineering\nSam   Operations", desc:"Listing tables comma-separated in FROM (FROM t1, t2) is the old-style implicit cross join — it also produces the Cartesian product. Adding a WHERE that matches keys turns it into an equi-join, which is how joins were written before the explicit JOIN keyword. Prefer explicit JOIN ... ON in new code: it separates the join condition from row filtering and prevents accidental Cartesian blowups when a WHERE is forgotten.",
  code:{sql:`SELECT c1, c2
 FROM t1, t2;`}},
-{id:"sql-self-join", cat:"SQL", title:"Self join", desc:"Join a table to itself using two aliases (e.g. employee -> manager).",
+{id:"sql-self-join", cat:"SQL", title:"Self join", level:"intermediate", example_output:"-- employees E JOIN employees M ON E.manager_id = M.id\nemployee  manager\nSam       Ada\nKim       Ada", desc:"A self join joins a table to itself, using two different aliases so you can compare rows within the same table. The classic case is a hierarchy stored in one table — employees with a manager_id pointing at another employee's id — where you alias the table as E (the worker) and M (the manager) and join E.manager_id = M.id. Aliases are mandatory here to tell the two 'copies' apart.",
  code:{sql:`SELECT c1, c2
 FROM t1 A
 INNER JOIN t1 B ON condition;`}},
