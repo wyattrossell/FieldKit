@@ -1714,7 +1714,8 @@ for n in nums:
 print("max:", biggest)        # 74`}},
 
 {id:"py-mut-mutability", cat:"Python Examples", title:"Mutation · Mutability vs. immutability",
- desc:"Lists can be changed in place; strings and tuples cannot.",
+ level:"beginner", example_output:"[99, 2, 3]\nzbc",
+ desc:"Mutability is whether an object can be changed after it's created. Lists are mutable — lst[0] = 99 edits the existing list. Strings and tuples are immutable — you can't assign into them (s[0] = 'z' raises TypeError), so you rebuild a new string instead. This one distinction drives much of Python's behaviour around copying and aliasing.",
  code:{py:`lst = [1, 2, 3]
 lst[0] = 99          # OK: lists are mutable
 print(lst)           # [99, 2, 3]
@@ -1723,14 +1724,16 @@ s = "abc"
 s = "zbc"            # must rebuild instead
 print(s)`}},
 {id:"py-mut-del", cat:"Python Examples", title:"Mutation · List element deletion (del)",
- desc:"Remove items by index or slice with del.",
+ level:"beginner", example_output:"['a', 'c', 'd']\n['d']",
+ desc:"del removes items from a list by position — a single index (del lst[1]) or a whole slice (del lst[0:2]) — shifting the remaining elements down. It changes the list in place and returns nothing. (del can also unbind a plain variable name, but on lists it's about removing elements.)",
  code:{py:`lst = ["a", "b", "c", "d"]
 del lst[1]           # remove by index
 print(lst)           # ['a', 'c', 'd']
 del lst[0:2]         # remove a slice
 print(lst)           # ['d']`}},
 {id:"py-mut-refs", cat:"Python Examples", title:"Mutation · Objects and references",
- desc:"A variable holds a reference to an object; is vs ==.",
+ level:"beginner", example_output:"True\nTrue\nFalse",
+ desc:"A variable doesn't hold an object directly; it holds a reference to one. b = a makes b point at the very same list, so 'a is b' (identity) is True. A separate list with equal contents gives 'a == c' True (same values) but 'a is c' False (different objects). Rule of thumb: == compares contents, is compares identity — use is mainly for None.",
  code:{py:`a = [1, 2, 3]
 b = a                 # b refers to the SAME object
 print(a is b)         # True
@@ -1738,13 +1741,15 @@ c = [1, 2, 3]
 print(a == c)         # True  (same contents)
 print(a is c)         # False (different objects)`}},
 {id:"py-mut-aliasing", cat:"Python Examples", title:"Mutation · Aliasing",
- desc:"Two names for one mutable object — changes show through both.",
+ level:"beginner", example_output:"[1, 2, 3, 4]",
+ desc:"When two names refer to the same mutable object they're aliases — a change made through one is visible through the other, because there's really only one list. Here appending via b also shows up in a. Aliasing is a frequent source of 'why did that change?' bugs, especially when a list is passed into a function that modifies it.",
  code:{py:`a = [1, 2, 3]
 b = a                # alias: two names, one list
 b.append(4)
 print(a)             # [1, 2, 3, 4]  <- change shows through 'a' too`}},
 {id:"py-mut-clone", cat:"Python Examples", title:"Mutation · Cloning lists",
- desc:"Make an independent copy so mutations don't leak.",
+ level:"beginner", example_output:"[1, 2, 3]\n[1, 2, 3, 4]",
+ desc:"To avoid aliasing, make a copy so the two lists are independent. a[:] (a full slice), list(a), and a.copy() all produce a new list with the same items; mutating the copy leaves the original untouched. Note this is a shallow copy — nested lists inside are still shared; for those use copy.deepcopy().",
  code:{py:`a = [1, 2, 3]
 b = a[:]             # slice makes a copy
 b.append(4)
@@ -1752,7 +1757,8 @@ print(a)             # [1, 2, 3]      unchanged
 print(b)             # [1, 2, 3, 4]
 # also: b = list(a)  or  b = a.copy()`}},
 {id:"py-mut-listmethods", cat:"Python Examples", title:"Mutation · Mutating list methods",
- desc:"append, insert, remove, pop, sort change the list in place.",
+ level:"beginner", example_output:"[0, 2, 3] popped: 4",
+ desc:"These list methods change the list in place and (mostly) return None, not a new list: append adds to the end, insert(i, x) puts x at index i, remove(x) deletes the first x, pop() removes and returns the last item, and sort() orders the list. Because they mutate, don't write lst = lst.sort() — that stores None; just call lst.sort().",
  code:{py:`lst = [3, 1, 2]
 lst.append(4)        # add to end
 lst.insert(0, 0)     # insert at index
@@ -1761,7 +1767,8 @@ popped = lst.pop()   # remove & return last
 lst.sort()           # sort in place
 print(lst, "popped:", popped)`}},
 {id:"py-mut-append-vs-concat", cat:"Python Examples", title:"Mutation · Append vs. concatenate",
- desc:"append mutates in place; + builds a new list.",
+ level:"beginner", example_output:"[1, 2, 3]\n[1, 2, 3]",
+ desc:"append and + look similar but differ in a way that matters. a.append(3) mutates the existing list in place and returns None. b = b + [3] builds a brand-new list and rebinds b to it, leaving the old one untouched. Inside loops, repeated + is also slower because it copies each time; prefer append for growing a list.",
  code:{py:`a = [1, 2]
 a.append(3)          # mutates a in place -> [1, 2, 3]
 print(a)
@@ -1769,7 +1776,8 @@ b = [1, 2]
 b = b + [3]          # builds a NEW list, rebinds b
 print(b)             # [1, 2, 3]`}},
 {id:"py-mut-strmethods", cat:"Python Examples", title:"Mutation · Non-mutating string methods",
- desc:"String methods return new strings; the original is unchanged.",
+ level:"beginner", example_output:"HELLO, WORLD\nhello, world\nHeLLo, WorLd\nHello, World\nHello, World",
+ desc:"Because strings are immutable, their methods never change the original — they return a new string. s.upper(), s.lower(), s.replace(old, new), and s.strip() all hand back a fresh value while s stays 'Hello, World'. So you must capture the result (s = s.upper()); calling s.upper() and ignoring it does nothing.",
  code:{py:`s = "Hello, World"
 print(s.upper())     # 'HELLO, WORLD'  (returns new string)
 print(s.lower())
@@ -1777,14 +1785,16 @@ print(s.replace("l", "L"))
 print(s.strip())
 print(s)             # original unchanged: 'Hello, World'`}},
 {id:"py-mut-format", cat:"Python Examples", title:"Mutation · String .format() method",
- desc:"Fill {} placeholders positionally or by name.",
+ level:"beginner", example_output:"Sam scored 95\n2 + 2 = 4\nAna is 30\n3.14",
+ desc:"str.format() fills {} placeholders in a template with the arguments you pass. Empty braces fill in order; numbered braces ({0}) reference or repeat arguments; named braces ({n}) match keyword arguments; and a format spec after a colon controls presentation ({:.2f} for two decimals). f-strings are usually shorter, but format() shines when the template is built separately from the data.",
  code:{py:`name, score = "Sam", 95
 print("{} scored {}".format(name, score))
 print("{0} + {0} = {1}".format(2, 4))       # positional
 print("{n} is {a}".format(n="Ana", a=30))   # named
 print("{:.2f}".format(3.14159))             # '3.14'`}},
 {id:"py-mut-fstrings", cat:"Python Examples", title:"Mutation · f-strings",
- desc:"Inline expressions and formatting inside f\"...\".",
+ level:"beginner", example_output:"Sam scored 95\n2 + 2 = 4\n3.14\n'Sam'",
+ desc:"An f-string (prefix f) drops expressions straight into a string inside {} — variables, arithmetic, function calls — evaluated on the spot. Add a format spec after a colon (:.2f) just like format(), or !r to show the repr (quoted) form. They're the most readable way to build strings in modern Python; just remember the leading f, or the braces stay literal.",
  code:{py:`name, score = "Sam", 95
 print(f"{name} scored {score}")
 print(f"{2} + {2} = {2 + 2}")     # expressions inside
@@ -1792,13 +1802,15 @@ pi = 3.14159
 print(f"{pi:.2f}")                # '3.14'
 print(f"{name!r}")               # 'Sam' with quotes (repr)`}},
 {id:"py-mut-accum-list", cat:"Python Examples", title:"Mutation · Accumulator pattern with lists",
- desc:"Start empty, append each computed item.",
+ level:"beginner", example_output:"[1, 4, 9, 16, 25]",
+ desc:"To build a list with a loop, start from an empty list and append each computed item as you go. This 'grow a collection' form of the accumulator pattern is everywhere — collecting, filtering, transforming results. (Once it's comfortable, a list comprehension — [n*n for n in range(1, 6)] — says the same thing in one line.)",
  code:{py:`squares = []                 # start empty
 for n in range(1, 6):
     squares.append(n * n)    # accumulate items
 print(squares)               # [1, 4, 9, 16, 25]`}},
 {id:"py-mut-accum-str", cat:"Python Examples", title:"Mutation · Accumulator pattern with strings",
- desc:"Build a string up piece by piece.",
+ level:"beginner", example_output:"PNG",
+ desc:"The same accumulator idea builds a string: start with '' and concatenate a piece each pass — here the first letter of each word to form an acronym. It reads clearly for small cases. For long loops, appending to a list and ''.join()-ing at the end is faster, since each + on a string makes a new copy.",
  code:{py:`acronym = ""                       # start empty
 for word in ["Portable", "Network", "Graphics"]:
     acronym = acronym + word[0]    # build up
