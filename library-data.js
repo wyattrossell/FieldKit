@@ -1518,14 +1518,16 @@ for _ in range(4):        # draw a square by calling methods
 wn.mainloop()             # keep the window open`}},
 
 {id:"py-seq-types", cat:"Python Examples", title:"Sequences · Strings, lists, tuples",
- desc:"Three sequence types: str and tuple are immutable, list is mutable.",
+ level:"beginner", example_output:"hello [1, 2, 3] (4, 5, 6)\n<class 'str'> <class 'list'> <class 'tuple'>",
+ desc:"Strings, lists, and tuples are all sequences — ordered collections you can index, slice, and loop over the same way. The key difference is mutability: a list can be changed in place (append an item, reassign one), while strings and tuples are immutable, so any 'change' really builds a new object. Reach for a list when contents will change, a tuple for a fixed record, a string for text.",
  code:{py:`s = "hello"            # string  (immutable sequence of chars)
 lst = [1, 2, 3]        # list    (mutable sequence)
 tup = (4, 5, 6)        # tuple   (immutable sequence)
 print(s, lst, tup)
 print(type(s), type(lst), type(tup))`}},
 {id:"py-seq-index", cat:"Python Examples", title:"Sequences · Index operator",
- desc:"Access an item by position; indexing starts at 0, negatives count from the end.",
+ level:"beginner", example_output:"P\nT\nN\n20",
+ desc:"The index operator [] pulls out one item by position. Counting starts at 0, so s[0] is the first character and s[2] is the third. Negative indices count from the right, so s[-1] is always the last item — handy when you don't know the length. Indexing past the end raises IndexError.",
  code:{py:`s = "PYTHON"
 print(s[0])    # 'P'  first item
 print(s[2])    # 'T'
@@ -1533,14 +1535,16 @@ print(s[-1])   # 'N'  last item
 data = [10, 20, 30]
 print(data[1]) # 20`}},
 {id:"py-seq-len", cat:"Python Examples", title:"Sequences · Length (len)",
- desc:"len() returns the number of items in a sequence.",
+ level:"beginner", example_output:"5\n4\n0\na",
+ desc:"len() returns how many items a sequence holds — characters in a string, elements in a list or tuple. It's the go-to for bounds and loops: the last valid index is len(seq) - 1, and range(len(seq)) walks every position. len() of an empty sequence is 0.",
  code:{py:`print(len("hello"))       # 5
 print(len([1, 2, 3, 4]))  # 4
 print(len(()))            # 0
 word = "banana"
 print(word[len(word) - 1])   # last char via len`}},
 {id:"py-seq-slice", cat:"Python Examples", title:"Sequences · Slice operator",
- desc:"start:stop:step returns a sub-sequence (stop excluded).",
+ level:"beginner", example_output:"bcd\nabc\nefg\naceg\ngfedcba",
+ desc:"A slice [start:stop:step] returns a new sub-sequence — from start up to but not including stop. Omit either end to run to the beginning or end (s[:3], s[4:]), add a step to skip items (s[::2]), and use a negative step to reverse (s[::-1]). Slicing never raises for out-of-range bounds; it just clamps to what exists.",
  code:{py:`s = "abcdefg"
 print(s[1:4])    # 'bcd'   start:stop
 print(s[:3])     # 'abc'   from start
@@ -1548,20 +1552,23 @@ print(s[4:])     # 'efg'   to end
 print(s[::2])    # 'aceg'  step
 print(s[::-1])   # 'gfedcba' reversed`}},
 {id:"py-seq-concat-repeat", cat:"Python Examples", title:"Sequences · Concatenation and repetition",
- desc:"+ joins sequences; * repeats them.",
+ level:"beginner", example_output:"[1, 2, 3, 4]\nabcd\n==========\n[0, 0, 0]",
+ desc:"The + operator joins two sequences of the same type into a new one, and * repeats a sequence a given number of times. They're a quick way to build separator strings ('=' * 10) or pre-sized lists ([0] * 3). Both create new objects rather than modifying in place, and you can't concatenate across types (list + str fails).",
  code:{py:`print([1, 2] + [3, 4])   # [1, 2, 3, 4]  concatenation
 print("ab" + "cd")       # 'abcd'
 print("=" * 10)          # '=========='  repetition
 print([0] * 3)           # [0, 0, 0]`}},
 {id:"py-seq-count-index", cat:"Python Examples", title:"Sequences · count and index",
- desc:"count() tallies occurrences; index() finds the first position.",
+ level:"beginner", example_output:"3\n3\n3\n2",
+ desc:"count(x) tallies how many times x appears in a sequence, and index(x) returns the position of its first occurrence (raising ValueError if it's absent). Both work on strings and lists. Use count() for frequency questions and index() to locate an item — though for a plain 'is it here at all?' the in operator (x in seq) reads better.",
  code:{py:`nums = [1, 2, 2, 3, 2]
 print(nums.count(2))     # 3   how many times 2 appears
 print(nums.index(3))     # 3   position of first 3
 print("banana".count("a"))  # 3
 print("banana".index("n"))  # 2`}},
 {id:"py-seq-split-join", cat:"Python Examples", title:"Sequences · Splitting and joining strings",
- desc:"split() a string into a list; join() a list into a string.",
+ level:"beginner", example_output:"['sam', '42', 'blue']\n['the', 'quick', 'fox']\n2024-01-15",
+ desc:"split() breaks a string into a list on a separator (or on any run of whitespace when you pass no argument), and join() does the reverse — it glues a list of strings together using the string you call it on as the glue ('-'.join(...)). They're the everyday tools for parsing CSV-like text and reassembling it. join() requires every item to already be a string.",
  code:{py:`csv = "sam,42,blue"
 parts = csv.split(",")        # ['sam', '42', 'blue']
 print(parts)
