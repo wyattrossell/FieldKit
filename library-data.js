@@ -1947,37 +1947,43 @@ for word in counts:
 print("most common:", best)`}},
 
 {id:"py-fn-def", cat:"Python Examples", title:"Functions · Function definition",
- desc:"def creates a function; defining it doesn't run it.",
+ level:"beginner", example_output:"Hello!\nWelcome.",
+ desc:"def creates a function — it names a block of code but doesn't run it; the body executes only when you call the function later with greet(). This lets you define reusable behaviour once and invoke it wherever needed. The indented lines under def are the function body; the first line back at the outer indentation ends it.",
  code:{py:`def greet():
     print("Hello!")
     print("Welcome.")
 # defining does not run it
 greet()          # now it runs`}},
 {id:"py-fn-invoke", cat:"Python Examples", title:"Functions · Function invocation",
- desc:"Call a function with (); calls can nest.",
+ level:"beginner", example_output:"25\n81",
+ desc:"You run a function by writing its name followed by parentheses, passing any arguments inside. A call evaluates to the function's return value, so calls can nest — square(square(3)) computes the inner call first (9), then the outer (81). Forgetting the parentheses gives you the function object itself, not the result of calling it.",
  code:{py:`def square(x):
     return x * x
 print(square(5))            # 25
 print(square(square(3)))   # square(9) -> 81`}},
 {id:"py-fn-params", cat:"Python Examples", title:"Functions · Parameters",
- desc:"Parameters receive arguments positionally or by keyword.",
+ level:"beginner", example_output:"1024\n8",
+ desc:"Parameters are the named slots in a definition; arguments are the values you supply at the call. Positional arguments fill parameters left to right (power(2, 10)), while keyword arguments name the slot explicitly (power(exp=3, base=2)) and so can come in any order. Keywords make calls self-documenting and let you skip past parameters that have defaults.",
  code:{py:`def power(base, exp):        # two parameters
     return base ** exp
 print(power(2, 10))          # 1024  (positional args)
 print(power(exp=3, base=2))  # 8     (keyword args)`}},
 {id:"py-fn-return", cat:"Python Examples", title:"Functions · Returning a value",
- desc:"return sends a value back to the caller.",
+ level:"beginner", example_output:"7",
+ desc:"return hands a value back to whoever called the function and immediately ends the function. That value can be stored, printed, or fed into another expression — it's how a function produces a result rather than merely performing an action. A function with no return (or a bare return) hands back None.",
  code:{py:`def add(a, b):
     return a + b       # hands a value back
 total = add(3, 4)
 print(total)           # 7`}},
 {id:"py-fn-annotations", cat:"Python Examples", title:"Functions · Type annotations",
- desc:"Document parameter/return types; Python does not enforce them.",
+ level:"intermediate", example_output:"ababab",
+ desc:"Type annotations document what types a function expects and returns — text: str, times: int, -> str. They're purely informational: Python does not check or enforce them at runtime, so passing the wrong type still runs (and may fail elsewhere). Their value is readability plus tooling — editors and type checkers like mypy use them to catch mistakes before you run.",
  code:{py:`def repeat(text: str, times: int) -> str:
     return text * times
 print(repeat("ab", 3))     # 'ababab'`}},
 {id:"py-fn-accum", cat:"Python Examples", title:"Functions · A function that accumulates",
- desc:"Wrap the accumulator pattern in a reusable function.",
+ level:"beginner", example_output:"10",
+ desc:"Wrapping the accumulator pattern in a function makes it reusable: total() initializes acc, adds each number, and returns the sum — so any caller can reuse it without repeating the loop. This is the essence of a function: name a computation once, then call it with different inputs. (The built-in sum() already does exactly this.)",
  code:{py:`def total(nums):
     acc = 0
     for n in nums:
@@ -1985,14 +1991,16 @@ print(repeat("ab", 3))     # 'ababab'`}},
     return acc
 print(total([1, 2, 3, 4]))   # 10`}},
 {id:"py-fn-local", cat:"Python Examples", title:"Functions · Local scope",
- desc:"Variables/parameters live only inside the function.",
+ level:"beginner", example_output:"10",
+ desc:"Names created inside a function — its parameters and any variables it assigns — are local: they exist only while the function runs and vanish when it returns. That's why print(x) outside f raises NameError; x lived only inside f. Local scope is a feature — functions can use handy names like x or i without clobbering anything outside.",
  code:{py:`def f():
     x = 10        # local to f
     print(x)
 f()
 # print(x)        # NameError: x doesn't exist out here`}},
 {id:"py-fn-global", cat:"Python Examples", title:"Functions · Global variables",
- desc:"global lets a function rebind a module-level name.",
+ level:"intermediate", example_output:"2",
+ desc:"By default, assigning to a name inside a function creates a new local — it won't touch a module-level variable of the same name. The global keyword overrides that, telling the function to rebind the outer name instead (so bump() really increments the shared count). Use it sparingly: functions that quietly change globals are hard to reason about; returning a value is usually cleaner.",
  code:{py:`count = 0
 def bump():
     global count      # rebind the module-level name
@@ -2000,12 +2008,14 @@ def bump():
 bump(); bump()
 print(count)          # 2`}},
 {id:"py-fn-composition", cat:"Python Examples", title:"Functions · Composition",
- desc:"Feed one function's result into another.",
+ level:"beginner", example_output:"10",
+ desc:"Composition means feeding one function's output straight into another — double(inc(4)) runs inc first (5), then double (10). Building programs from small functions that each do one thing, then chaining them, keeps code readable and testable. It's the same idea as piping commands together, just with parentheses nesting inside-out.",
  code:{py:`def double(x): return x * 2
 def inc(x):    return x + 1
 print(double(inc(4)))     # double(5) -> 10`}},
 {id:"py-fn-print-vs-return", cat:"Python Examples", title:"Functions · Print vs. return",
- desc:"print shows a value; return hands it back (a printing function returns None).",
+ level:"beginner", example_output:"5\ngot: None\ngot: 5",
+ desc:"print and return are easy to confuse but do different jobs. print shows a value on screen for a human and itself evaluates to None. return hands a value back to the program so it can be used further. A function that only prints returns None — so x = add_p(2, 3) stores None, a classic surprise. If the caller needs the value, the function must return it.",
  code:{py:`def add_p(a, b): print(a + b)    # shows it, returns None
 def add_r(a, b): return a + b    # hands value back
 x = add_p(2, 3)     # prints 5
@@ -2013,14 +2023,16 @@ print("got:", x)    # got: None
 y = add_r(2, 3)
 print("got:", y)    # got: 5`}},
 {id:"py-fn-mutable-args", cat:"Python Examples", title:"Functions · Passing mutable objects",
- desc:"A function can mutate a list/dict passed to it.",
+ level:"intermediate", example_output:"['a', 'new']",
+ desc:"Arguments are passed by object reference, so passing a mutable object (a list, dict) hands the function the same object — not a copy. Calling lst.append inside add_item therefore changes the caller's list. Powerful, but easy to overlook: if a function shouldn't modify its input, have it work on a copy (lst[:]) or return a new value instead.",
  code:{py:`def add_item(lst):
     lst.append("new")     # mutates the caller's list
 items = ["a"]
 add_item(items)
 print(items)              # ['a', 'new']`}},
 {id:"py-fn-side-effects", cat:"Python Examples", title:"Functions · Side effects",
- desc:"Changing state outside the function (printing, mutating, files).",
+ level:"intermediate", example_output:"start\n['start']",
+ desc:"A side effect is anything a function does beyond returning a value — printing, mutating an outer list, writing a file, changing global state. Side effects are how programs actually do things, but they make functions harder to test and reuse. A good habit: prefer 'pure' functions (values in, value out) where you can, and keep the side-effecting parts few and obvious.",
  code:{py:`log = []
 def record(msg):
     log.append(msg)       # side effect: mutates outer list
