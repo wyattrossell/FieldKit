@@ -2487,7 +2487,8 @@ t = Temp(100)
 print(t.fahrenheit, Temp.freezing())   # 212.0 0`}},
 
 {id:"py-inh-intro", cat:"Python Examples", title:"Inheritance · Class inheritance",
- desc:"A subclass gets the parent's methods for free.",
+ level:"intermediate", example_output:"breathing",
+ desc:"Inheritance lets one class build on another. Writing 'class Dog(Animal):' makes Dog a subclass of Animal, so it automatically gains all of Animal's methods — Dog().breathe() works even though Dog defines nothing itself. This models 'is-a' relationships (a Dog is an Animal) and avoids repeating shared behaviour across related classes.",
  code:{py:`class Animal:
     def breathe(self):
         print("breathing")
@@ -2495,7 +2496,8 @@ class Dog(Animal):        # Dog inherits from Animal
     pass
 Dog().breathe()           # inherited method works`}},
 {id:"py-inh-subclass", cat:"Python Examples", title:"Inheritance · Defining a subclass",
- desc:"A subclass extends the parent with its own state/behavior.",
+ level:"intermediate", example_output:"square 4",
+ desc:"A subclass usually adds to its parent rather than just inheriting. Square defines its own __init__ to store a side, but first calls super().__init__('square') to run the parent's setup so the inherited name is initialized too. The pattern is: call super().__init__(...) first, then add the subclass's own state. Skipping that super call is a common bug that leaves parent attributes unset.",
  code:{py:`class Shape:
     def __init__(self, name):
         self.name = name
@@ -2506,7 +2508,8 @@ class Square(Shape):
 s = Square(4)
 print(s.name, s.side)        # square 4`}},
 {id:"py-inh-lookup", cat:"Python Examples", title:"Inheritance · Attribute lookup order",
- desc:"Python searches the instance, then the class, then its parents.",
+ level:"intermediate", example_output:"from A\non b",
+ desc:"When you access an attribute, Python searches in order: the instance itself, then its class, then each parent up the chain — returning the first match. So b.x finds x on the parent A. Assigning b.x = 'on b' creates an instance attribute that shadows the class one for that object only. This lookup order (the MRO) is also how inherited methods and overrides are resolved.",
  code:{py:`class A:
     x = "from A"
 class B(A):
@@ -2516,7 +2519,8 @@ print(b.x)         # 'from A'  (found on parent A)
 b.x = "on b"       # instance attribute shadows the class one
 print(b.x)         # 'on b'`}},
 {id:"py-inh-override", cat:"Python Examples", title:"Inheritance · Overriding methods",
- desc:"A subclass can replace a parent method.",
+ level:"intermediate", example_output:"... meow",
+ desc:"A subclass can override a method by defining one with the same name — Cat.speak replaces Animal.speak for Cat instances, while Animal itself is unchanged. Because Python looks up methods on the actual object's class first, calling speak() on a Cat runs the Cat version. Overriding is how subclasses specialize shared behaviour (every Animal speaks, but each kind speaks differently).",
  code:{py:`class Animal:
     def speak(self):
         return "..."
@@ -2525,7 +2529,8 @@ class Cat(Animal):
         return "meow"
 print(Animal().speak(), Cat().speak())   # ... meow`}},
 {id:"py-inh-super", cat:"Python Examples", title:"Inheritance · Invoking the parent method (super)",
- desc:"super() calls the parent's version of a method.",
+ level:"advanced", example_output:"LOG: hi\n  (also handled here)",
+ desc:"When you override a method but still want the parent's behaviour, call it with super(). Here TimeLogger.log runs the base Logger.log via super().log(msg) and then adds its own step — extending rather than fully replacing. This 'do the parent's work, then a bit more' pattern is very common, especially in __init__, and super() finds the right parent automatically, even with multiple inheritance.",
  code:{py:`class Logger:
     def log(self, msg):
         print("LOG:", msg)
@@ -2535,7 +2540,8 @@ class TimeLogger(Logger):
         print("  (also handled here)")
 TimeLogger().log("hi")`}},
 {id:"py-inh-multiple", cat:"Python Examples", title:"Inheritance · Multiple inheritance",
- desc:"A class can inherit from more than one parent.",
+ level:"advanced", example_output:"swim fly",
+ desc:"A class can inherit from several parents at once — Duck(Swimmer, Flyer) gains both move() and fly(). This mixes capabilities from multiple sources (often called mixins). When two parents define the same name, Python resolves it using the method resolution order (left to right, depth considered). Multiple inheritance is powerful but can get confusing, so keep the hierarchy shallow and responsibilities clear.",
  code:{py:`class Swimmer:
     def move(self): return "swim"
 class Flyer:
@@ -2546,23 +2552,27 @@ d = Duck()
 print(d.move(), d.fly())           # swim fly`}},
 
 {id:"py-fp-map", cat:"Python Examples", title:"Functional · map",
- desc:"Apply a function to every item, producing a new iterable.",
+ level:"intermediate", example_output:"[1, 4, 9, 16]\n['1', '2', '3', '4']",
+ desc:"map(func, iterable) applies func to every item, yielding a new iterable of results — a transform with no explicit loop. Here it squares each number, then converts each to a string. map is lazy (it produces items on demand), so wrap it in list() to see them. A list comprehension often reads more clearly, but map shines when you already have a named function to apply.",
  code:{py:`nums = [1, 2, 3, 4]
 squared = list(map(lambda x: x * x, nums))    # apply to each
 print(squared)                                 # [1, 4, 9, 16]
 print(list(map(str, nums)))                    # ['1','2','3','4']`}},
 {id:"py-fp-filter", cat:"Python Examples", title:"Functional · filter",
- desc:"Keep only items for which the function returns True.",
+ level:"intermediate", example_output:"[2, 4, 6, 8, 10]",
+ desc:"filter(func, iterable) keeps only the items for which func returns True, dropping the rest — a selection without a loop-and-if. Here it keeps the even numbers. Like map it's lazy, so list() realizes it. And like map, a comprehension with an if ([x for x in nums if x % 2 == 0]) expresses the same idea, which many find more readable.",
  code:{py:`nums = range(1, 11)
 evens = list(filter(lambda x: x % 2 == 0, nums))
 print(evens)                                     # [2, 4, 6, 8, 10]`}},
 {id:"py-fp-comprehension", cat:"Python Examples", title:"Functional · List comprehensions",
- desc:"Build a list from an expression over an iterable, with an optional filter.",
+ level:"intermediate", example_output:"[0, 1, 4, 9, 16]\n[0, 2, 4, 6, 8]\n['A', 'B', 'C']",
+ desc:"A list comprehension builds a list in one expression: [expression for item in iterable if condition]. It folds map (the expression transforms each item) and filter (the optional if keeps only some) into one readable line, and it's the most idiomatic way to construct lists in Python. Dict and set comprehensions follow the same shape. Keep each to one clear transform; nest sparingly.",
  code:{py:`print([x * x for x in range(5)])              # [0, 1, 4, 9, 16]
 print([x for x in range(10) if x % 2 == 0])   # evens
 print([c.upper() for c in "abc"])             # ['A', 'B', 'C']`}},
 {id:"py-fp-zip", cat:"Python Examples", title:"Functional · zip",
- desc:"Pair up items from several iterables position by position.",
+ level:"intermediate", example_output:"Sam 42\nAna 30\nKim 25\n{'Sam': 42, 'Ana': 30, 'Kim': 25}",
+ desc:"zip() pairs up items from several iterables by position — the first of each, then the second, and so on — yielding tuples you can unpack in a loop. It's the clean way to walk two related lists together (names with ages) instead of indexing. zip stops at the shortest input, and wrapping it in dict() turns paired keys and values straight into a dictionary.",
  code:{py:`names = ["Sam", "Ana", "Kim"]
 ages = [42, 30, 25]
 for name, age in zip(names, ages):     # pair them up
