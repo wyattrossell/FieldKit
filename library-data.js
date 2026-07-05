@@ -2615,20 +2615,20 @@ print(dict(zip(names, ages)))          # {'Sam': 42, 'Ana': 30, 'Kim': 25}`}},
 /* ================= SQL ================= */
 
 /* ---------- querying a table ---------- */
-{id:"sql-select-cols", cat:"SQL", title:"SELECT columns", desc:"Return only the named columns from a table.",
+{id:"sql-select-cols", cat:"SQL", title:"SELECT columns", level:"beginner", example_output:"-- employees: SELECT name, dept FROM employees;\nname  dept\nAda   Eng\nSam   Ops\nKim   Eng", desc:"SELECT lists the columns you want back, in the order you name them, from the table after FROM. Naming columns explicitly (rather than SELECT *) returns only the data you need, documents intent, and is more stable if the table later gains columns. End statements with a semicolon. The result is a table of rows limited to those columns.",
  code:{sql:`SELECT c1, c2 FROM t;`}},
-{id:"sql-select-all", cat:"SQL", title:"SELECT * (all columns)", desc:"Return every column and row; * means all columns.",
+{id:"sql-select-all", cat:"SQL", title:"SELECT * (all columns)", level:"beginner", example_output:"-- SELECT * FROM employees;\nid  name  dept  salary\n1   Ada   Eng   95000\n2   Sam   Ops   72000", desc:"SELECT * returns every column of every row — a quick way to eyeball a table's full contents. It's handy at the prompt while exploring, but avoid it in application code: it fetches columns you may not need, breaks when the schema changes, and hides which columns you actually rely on. Prefer an explicit column list in anything you'll keep.",
  code:{sql:`SELECT * FROM t;`}},
-{id:"sql-where", cat:"SQL", title:"WHERE (filter rows)", desc:"Keep only rows that satisfy a condition.",
+{id:"sql-where", cat:"SQL", title:"WHERE (filter rows)", level:"beginner", example_output:"-- SELECT name, salary FROM employees WHERE salary > 80000;\nname  salary\nAda   95000\nKim   88000", desc:"WHERE filters rows, keeping only those for which the condition is true — it runs before grouping and ordering. Conditions combine comparisons (=, <>, >, <, >=, <=) with AND, OR, and NOT, and can use LIKE, IN, BETWEEN, and IS NULL. Note SQL uses a single = for equality, and comparing anything to NULL yields UNKNOWN, so those rows are excluded.",
  code:{sql:`SELECT c1, c2 FROM t
 WHERE condition;`}},
-{id:"sql-distinct", cat:"SQL", title:"SELECT DISTINCT", desc:"Drop duplicate rows from the result set.",
+{id:"sql-distinct", cat:"SQL", title:"SELECT DISTINCT", level:"beginner", example_output:"-- SELECT DISTINCT dept FROM employees;\ndept\nEng\nOps\nSales", desc:"SELECT DISTINCT removes duplicate rows from the result, so you get each unique combination of the selected columns once. It's the go-to for 'what are the distinct values here?' (e.g. the set of departments). DISTINCT applies to all selected columns together, and it can be costly on large results since the database must dedupe — so select only the columns you need.",
  code:{sql:`SELECT DISTINCT c1 FROM t
 WHERE condition;`}},
-{id:"sql-orderby", cat:"SQL", title:"ORDER BY", desc:"Sort the result set; ASC is the default, DESC reverses it (per column).",
+{id:"sql-orderby", cat:"SQL", title:"ORDER BY", level:"beginner", example_output:"-- SELECT name, salary FROM employees ORDER BY salary DESC;\nname  salary\nAda   95000\nKim   88000\nSam   72000", desc:"ORDER BY sorts the result by one or more columns. ASC (ascending) is the default; DESC reverses it, and you can set the direction per column (ORDER BY dept ASC, salary DESC). Sorting happens last — after WHERE and GROUP BY — so you can order by computed or aggregated columns. Without ORDER BY, row order is not guaranteed, so never rely on 'natural' order.",
  code:{sql:`SELECT c1, c2 FROM t
 ORDER BY c1 ASC;   -- or DESC`}},
-{id:"sql-limit", cat:"SQL", title:"LIMIT / OFFSET", desc:"Skip offset rows then return the next n. LIMIT/OFFSET is MySQL/PostgreSQL/SQLite; SQL Server & Oracle use OFFSET ... FETCH.",
+{id:"sql-limit", cat:"SQL", title:"LIMIT / OFFSET", level:"beginner", example_output:"-- SELECT name FROM employees ORDER BY name LIMIT 2 OFFSET 1;\nname\nKim\nLee", desc:"LIMIT caps how many rows come back, and OFFSET skips rows first — together they do paging (page 2 of ten-row pages is LIMIT 10 OFFSET 10). Always pair them with ORDER BY, or 'the first n rows' is arbitrary. Dialects differ: LIMIT/OFFSET is MySQL, PostgreSQL, and SQLite; SQL Server and Oracle use the standard OFFSET ... FETCH NEXT n ROWS ONLY.",
  code:{sql:`SELECT c1, c2 FROM t
 ORDER BY c1
 LIMIT n OFFSET offset;`}},
