@@ -315,6 +315,24 @@
     margin:0; padding:16px; overflow-x:auto; font-family:var(--mono); font-size:12.5px;
     line-height:1.65; color:#dfe6ee; white-space:pre; tab-size:2;
   }
+  /* IDE-style syntax highlighting tokens (dark themes) */
+  .tok-com{color:#7c9c6e; font-style:italic}
+  .tok-str{color:#d69d78}
+  .tok-kw{color:#5aa9e6}
+  .tok-num{color:#b5cea8}
+  .tok-fn{color:#dcdcaa}
+  .tok-var{color:#9cdcfe}
+  .tok-op{color:var(--muted)}
+  :root[data-theme="paper"] .tok-com{color:#4f7d3a}
+  :root[data-theme="paper"] .tok-str{color:#a3413a}
+  :root[data-theme="paper"] .tok-kw{color:#1a56cf}
+  :root[data-theme="paper"] .tok-num{color:#0e7a52}
+  :root[data-theme="paper"] .tok-fn{color:#7a5c1a}
+  :root[data-theme="paper"] .tok-var{color:#26408b}
+  :root[data-theme="contrast"] .tok-com{color:#8fcf7f}
+  :root[data-theme="contrast"] .tok-str{color:#f0a878}
+  :root[data-theme="contrast"] .tok-kw{color:#7ac0ff}
+  :root[data-theme="contrast"] .tok-fn{color:#f0e68c}
   .placeholder{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--faint); gap:16px; padding:40px}
   .placeholder .big{font-family:var(--mono); font-size:20px; color:var(--amber); letter-spacing:3px; font-weight:700}
   .placeholder .hint{font-size:13px; max-width:42ch; text-align:center; line-height:1.6}
@@ -394,6 +412,7 @@
     .codebar{ background:#eee; border-color:#888; }
     .codebar .fname{ color:#000; }
     pre{ color:#000; white-space:pre-wrap; overflow-wrap:anywhere; font-size:9.5pt; line-height:1.5; }
+    .tok-com,.tok-str,.tok-kw,.tok-num,.tok-fn,.tok-var,.tok-op{ color:#000 !important; font-style:normal; }
     .dm{ margin:0 0 12pt; }
     .dm-row{ background:#fff; border:1px solid #888; color:#000; break-inside:avoid; }
     .dm-k.detect, .dm-k.mitigate{ color:#000; }
@@ -1152,7 +1171,7 @@ function renderDetail(){
     ${item.example_output?`<div class="exout"><div class="exout-h">Example output — what success looks like</div><pre class="exout-pre">${esc(item.example_output)}</pre></div>`:""}
     ${dm}
     ${relatedBlock(item)}`;
-  const paint=()=>{ $("#codeEl").textContent=fillTemplate(raw, phValues); };
+  const paint=()=>{ $("#codeEl").innerHTML=highlightCode(fillTemplate(raw, phValues), selectedLang); };
   paint();
   detailEl.querySelectorAll(".phf input").forEach(inp=>{
     inp.oninput=()=>{ phValues[inp.dataset.ph]=inp.value; paint(); };
@@ -1184,7 +1203,7 @@ function renderToolDetail(item){
   const inst=item.install ? `<div class="inst">${Object.entries(item.install).map(([k,v])=>
     `<div class="inst-row">
        <span class="inst-os">${esc(OS[k]||k)}</span>
-       <span class="inst-cmd">${esc(v)}</span>
+       <span class="inst-cmd">${highlightCode(v, k==="cmd"?"cmd":"linux")}</span>
        <button class="act inst-copy" data-cmd="${esc(v)}">Copy</button>
      </div>`).join("")}</div>` : "";
   detailEl.innerHTML=`
@@ -1449,6 +1468,96 @@ $("#rbImportFile").onchange=e=>{
 
 /* ---------- utils ---------- */
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ---------- offline IDE-style syntax highlighting (no dependencies) ---------- */
+const HL_KW = {
+  py:  "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield",
+  sql: "select from where and or not null is in like between distinct order by group having limit offset fetch next rows only join inner left right full outer cross on as union all intersect except minus insert into values update set delete create table drop alter add column constraint primary key foreign references unique check default view index trigger truncate rename to with recursive temporary temp asc desc case when then else end begin exists returning natural",
+  ps:  "if else elseif foreach for while do switch function return param try catch finally throw break continue in begin process end",
+  cmd: "if else for in do goto call set echo exit",
+  sh:  "if then else elif fi for while until do done case esac in function return then"
+};
+function hlKW(words, ci){ return new RegExp("\\b(?:"+words.trim().split(/\s+/).join("|")+")\\b", ci?"iy":"y"); }
+function hlRules(lang){
+  const R=[];
+  if(lang==="py"){
+    R.push(["com", /#[^\n]*/y]);
+    R.push(["str", /[rbfuRBFU]{0,2}("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')/y]);
+    R.push(["fn",  /@[A-Za-z_]\w*/y]);
+    R.push(["num", /\b\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?\b/y]);
+    R.push(["kw",  hlKW(HL_KW.py,false)]);
+    R.push(["fn",  /\b(?:print|len|range|int|float|str|bool|list|dict|set|tuple|sum|min|max|sorted|enumerate|zip|map|filter|open|input|type|isinstance|super|abs|round|repr|reversed|any|all|next|iter)\b/y]);
+    R.push([null,  /[A-Za-z_]\w*/y]);
+  } else if(lang==="sql"){
+    R.push(["com", /--[^\n]*|\/\*[\s\S]*?\*\//y]);
+    R.push(["str", /'(?:[^']|'')*'/y]);
+    R.push(["num", /\b\d+(?:\.\d+)?\b/y]);
+    R.push(["kw",  hlKW(HL_KW.sql,true)]);
+    R.push(["fn",  /\b(?:count|sum|avg|min|max|coalesce|cast|nullif|now|upper|lower|length|substr|substring|trim|round)\b/iy]);
+    R.push([null,  /[A-Za-z_]\w*/y]);
+  } else if(lang==="ps"){
+    R.push(["com", /<#[\s\S]*?#>|#[^\n]*/y]);
+    R.push(["str", /"(?:[^"`]|`.)*"|'[^']*'/y]);
+    R.push(["var", /\$(?:\{[^}]*\}|[A-Za-z_]\w*(?::\w+)?|[_?^$])/y]);
+    R.push(["kw",  /-(?:eq|ne|gt|lt|ge|le|match|notmatch|like|notlike|contains|notcontains|in|notin|and|or|not|is|isnot|replace|join|split)\b/y]);
+    R.push(["kw",  hlKW(HL_KW.ps,true)]);
+    R.push(["fn",  /\b[A-Za-z]+-[A-Za-z]\w*/y]);
+    R.push(["op",  /-[A-Za-z]\w*/y, hlAfterSpace]);
+    R.push(["num", /\b\d+\b/y]);
+    R.push([null,  /[A-Za-z_]\w*/y]);
+  } else if(lang==="cmd"){
+    R.push(["com", /(?:::|@?rem\b)[^\n]*/iy]);
+    R.push(["str", /"[^"\n]*"/y]);
+    R.push(["var", /%[^%\n]*%|%~?[\w]+|![^!\n]*!/y]);
+    R.push(["kw",  hlKW(HL_KW.cmd,true)]);
+    R.push(["fn",  /[A-Za-z_][\w.-]*/y, hlCmdStart]);
+    R.push(["op",  /\/[A-Za-z?]+/y, hlAfterSpace]);
+    R.push(["num", /\b\d+\b/y]);
+    R.push([null,  /[A-Za-z_]\w*/y]);
+  } else if(lang==="dork"){
+    R.push(["kw",  /\b(?:site|inurl|intitle|intext|allintext|allinurl|allintitle|filetype|ext|cache|related|link|info|define|before|after|around|source|loc|map|movie|weather|stocks)(?=:)/y]);
+    R.push(["str", /"[^"\n]*"/y]);
+    R.push([null,  /[A-Za-z_]\w*/y]);
+  } else {   // shell: linux, mac
+    R.push(["com", /#[^\n]*/y, i=>i===0||" \t\n".indexOf(hlSrc[i-1])>=0]);
+    R.push(["str", /"(?:[^"\\]|\\.)*"|'[^']*'/y]);
+    R.push(["var", /\$(?:\{[^}]*\}|\([^)]*\)|[A-Za-z_]\w*|[@?#*!$-])/y]);
+    R.push(["kw",  hlKW(HL_KW.sh,false)]);
+    R.push(["fn",  /[A-Za-z_][\w.\/-]*/y, hlCmdStart]);
+    R.push(["op",  /-{1,2}[A-Za-z][\w-]*/y, hlAfterSpace]);
+    R.push(["num", /\b\d+\b/y]);
+    R.push([null,  /[A-Za-z_][\w-]*/y]);
+  }
+  return R;
+}
+function hlAfterSpace(i){ const c=hlSrc[i-1]; return i>0 && (c===" "||c==="\t"); }
+function hlCmdStart(i){
+  const c=hlSrc[i];
+  if(!((c>="a"&&c<="z")||(c>="A"&&c<="Z")||c==="_"||c==="/"||c===".")) return false;
+  return /(?:^|[\n|;&(`])[ \t]*(?:sudo[ \t]+|nohup[ \t]+|time[ \t]+|exec[ \t]+|command[ \t]+)*$/.test(hlSrc.slice(0,i));
+}
+let hlSrc="";   // current source, so guards can look at neighbouring chars
+function highlightCode(code, lang){
+  hlSrc = code;
+  const rules = hlRules((lang==="mac"||lang==="linux")?"sh":lang);
+  let out="", i=0, n=code.length, guard=0;
+  while(i<n && guard++<200000){
+    let hit=false;
+    for(const r of rules){
+      const cls=r[0], re=r[1], g=r[2];
+      if(g && !g(i)) continue;
+      re.lastIndex=i;
+      const m=re.exec(code);
+      if(m && m.index===i && m[0].length){
+        out += cls ? `<span class="tok-${cls}">${esc(m[0])}</span>` : esc(m[0]);
+        i += m[0].length; hit=true; break;
+      }
+    }
+    if(!hit){ out += esc(code[i]); i++; }
+  }
+  if(i<n) out += esc(code.slice(i));
+  return out;
+}
 function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40); }
 
 /* ---------- persistence: custom snippets survive close/reopen & travel on the USB ---------- */
