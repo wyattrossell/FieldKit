@@ -2041,39 +2041,46 @@ record("start")
 print(log)                # ['start']`}},
 
 {id:"py-tup-packing", cat:"Python Examples", title:"Tuples · Tuple packing",
- desc:"Comma-separated values pack into a tuple (parens optional).",
+ level:"beginner", example_output:"(3, 4)\n<class 'tuple'>",
+ desc:"A tuple is an immutable, ordered group of values. Writing comma-separated values packs them into a tuple — the parentheses are usually optional, so point = 3, 4 makes (3, 4); the comma is what matters. Tuples suit fixed records whose contents shouldn't change (a coordinate, an RGB colour), and because they're immutable they can even serve as dictionary keys.",
  code:{py:`point = 3, 4          # -> (3, 4)
 print(point)
 print(type(point))    # <class 'tuple'>`}},
 {id:"py-tup-unpack", cat:"Python Examples", title:"Tuples · Tuple assignment with unpacking",
- desc:"Spread a tuple across several names at once.",
+ level:"beginner", example_output:"3 4",
+ desc:"Unpacking spreads a tuple's items across several names in one assignment: x, y = point binds x to the first item and y to the second. The number of names must match the number of items, or you get a ValueError. It's a clean way to name the parts of a returned pair or a record without indexing.",
  code:{py:`point = (3, 4)
 x, y = point          # unpack into two names
 print(x, y)           # 3 4`}},
 {id:"py-tup-swap", cat:"Python Examples", title:"Tuples · Swapping values",
- desc:"Swap two variables in one line, no temp needed.",
+ level:"beginner", example_output:"2 1",
+ desc:"Because the right-hand side is evaluated first (into a tuple) before anything is assigned, a, b = b, a swaps two variables in a single line — no temporary needed. It reads exactly as 'let a and b become b and a'. This is the idiomatic Python swap, and it generalises to rotating three or more values at once.",
  code:{py:`a, b = 1, 2
 a, b = b, a           # swap
 print(a, b)           # 2 1`}},
 {id:"py-tup-iter-unpack", cat:"Python Examples", title:"Tuples · Unpacking into iterator variables",
- desc:"Unpack each tuple as you loop a list of tuples.",
+ level:"beginner", example_output:"1 a\n2 b\n3 c",
+ desc:"When you loop over a list of tuples, you can unpack each one right in the for-target: for num, letter in pairs gives you both parts by name every pass, instead of indexing pair[0] and pair[1]. It makes loops over paired or record-like data read almost like English — and it's exactly how looping over dict.items() works.",
  code:{py:`pairs = [(1, "a"), (2, "b"), (3, "c")]
 for num, letter in pairs:      # unpack each tuple
     print(num, letter)`}},
 {id:"py-tup-enumerate", cat:"Python Examples", title:"Tuples · enumerate",
- desc:"Loop with both an index and the value.",
+ level:"beginner", example_output:"0 a\n1 b\n2 c\n1 x\n2 y",
+ desc:"enumerate() wraps an iterable so each pass yields an (index, value) pair, which you unpack into two names — the tidy alternative to managing a counter or looping over range(len(...)). Pass start= to begin numbering somewhere other than 0 (handy for human-facing 1-based lists). It's the standard answer to 'I need the position and the item.'",
  code:{py:`for i, item in enumerate(["a", "b", "c"]):
     print(i, item)             # 0 a / 1 b / 2 c
 for i, item in enumerate(["x", "y"], start=1):
     print(i, item)             # 1 x / 2 y`}},
 {id:"py-tup-return", cat:"Python Examples", title:"Tuples · Tuples as return values",
- desc:"Return several values as a tuple, then unpack them.",
+ level:"beginner", example_output:"1 8",
+ desc:"A function returns a single object — but that object can be a tuple, which is how Python functions effectively return several values at once (return min(nums), max(nums)). The caller unpacks them into separate names: lo, hi = min_max(...). It's cleaner than returning a list or a dict when there's a small, fixed set of outputs.",
  code:{py:`def min_max(nums):
     return min(nums), max(nums)   # returns a tuple
 lo, hi = min_max([4, 1, 8, 3])
 print(lo, hi)                     # 1 8`}},
 {id:"py-tup-arg-unpack", cat:"Python Examples", title:"Tuples · Unpacking tuples as function arguments",
- desc:"* spreads a tuple into positional arguments.",
+ level:"intermediate", example_output:"6",
+ desc:"The * operator in a call unpacks a sequence into separate positional arguments, so add(*args) with args = (1, 2, 3) is exactly add(1, 2, 3). It's the mirror image of *args in a definition (which packs arguments into a tuple). Use it to forward a collected set of arguments, or to pass a list/tuple's elements to a function that expects them individually. (** does the same for dicts into keyword arguments.)",
  code:{py:`def add(a, b, c):
     return a + b + c
 args = (1, 2, 3)
