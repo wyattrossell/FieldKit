@@ -2087,21 +2087,24 @@ args = (1, 2, 3)
 print(add(*args))       # -> add(1, 2, 3) -> 6`}},
 
 {id:"py-while", cat:"Python Examples", title:"While loops · The while statement",
- desc:"Repeat while a condition stays true; move toward the exit.",
+ level:"beginner", example_output:"5\n4\n3\n2\n1\nliftoff",
+ desc:"A while loop repeats its block as long as a condition stays True, re-checking that condition before each pass. Unlike a for loop, you manage the progress yourself — here n -= 1 moves toward the exit. The cardinal rule: something in the body must eventually make the condition False, or you get an infinite loop. Use while when you don't know in advance how many times to repeat.",
  code:{py:`n = 5
 while n > 0:
     print(n)
     n -= 1              # must progress toward stopping
 print("liftoff")`}},
 {id:"py-while-listener", cat:"Python Examples", title:"While loops · The listener loop",
- desc:"Keep reading input until told to stop. Reads from the keyboard.",
+ level:"beginner", example_output:"command (quit to exit): hello\nyou said: hello\ncommand (quit to exit): quit",
+ desc:"A listener loop runs 'forever' (while True) and reads input each pass, breaking out when a stop condition is met — here typing 'quit'. It's the shape of interactive tools and menus: keep prompting until the user chooses to leave. The break is what makes while True safe; without an exit path it would never end.",
  code:{py:`while True:
     cmd = input("command (quit to exit): ")
     if cmd == "quit":
         break
     print("you said:", cmd)`}},
 {id:"py-while-sentinel", cat:"Python Examples", title:"While loops · Sentinel values",
- desc:"A special value signals the loop to end. Reads from the keyboard.",
+ level:"beginner", example_output:"number (blank to finish): 10\nnumber (blank to finish): 5\nnumber (blank to finish): \ntotal: 15",
+ desc:"A sentinel is a special input value that means 'stop' — here an empty line ends the loop. The loop reads values and accumulates them until the sentinel appears, then reports the result. Choose a sentinel that can't be real data (blank input, or a marker like -1) so you never mistake genuine data for the stop signal.",
  code:{py:`total = 0
 while True:
     entry = input("number (blank to finish): ")
@@ -2110,7 +2113,8 @@ while True:
     total += int(entry)
 print("total:", total)`}},
 {id:"py-while-validation", cat:"Python Examples", title:"While loops · Input validation",
- desc:"Loop until the input passes a check. Reads from the keyboard.",
+ level:"beginner", example_output:"Age (0-120): abc\ntry again\nAge (0-120): 200\ntry again\nAge (0-120): 42\nok: 42",
+ desc:"To insist on good input, loop until it passes a check and only then break. Here isdigit() confirms the text is all digits before int() is trusted, and the range test rejects out-of-bounds numbers — bad entries just re-prompt. This 'loop-and-a-half' (test in the middle, break on success) is the standard way to validate user input robustly.",
  code:{py:`while True:
     age = input("Age (0-120): ")
     if age.isdigit() and 0 <= int(age) <= 120:
@@ -2118,7 +2122,8 @@ print("total:", total)`}},
     print("try again")
 print("ok:", age)`}},
 {id:"py-while-break-continue", cat:"Python Examples", title:"While loops · break and continue",
- desc:"break exits the loop; continue skips to the next pass.",
+ level:"beginner", example_output:"1\n2\n4\n5",
+ desc:"break and continue give a loop two escape hatches. continue skips the rest of the current pass and jumps to the next iteration (here it drops 3). break leaves the loop entirely (here it stops at 6, so 6 onward never print). They work in both for and while loops; use them to handle special cases without piling up nested if/else.",
  code:{py:`for n in range(1, 10):
     if n == 3:
         continue        # skip the rest of THIS pass
@@ -2127,32 +2132,37 @@ print("ok:", age)`}},
     print(n)            # 1, 2, 4, 5`}},
 
 {id:"py-adv-optional", cat:"Python Examples", title:"Adv. functions · Optional parameters",
- desc:"Give a parameter a default so callers may omit it.",
+ level:"intermediate", example_output:"Hello Sam\nHi Ana",
+ desc:"A default value makes a parameter optional: def greet(name, greeting='Hello') lets callers omit greeting and get the default, or pass their own to override it. Defaults must come after the non-default parameters. One trap worth knowing: never use a mutable default like [] or {} — it's created once and shared across calls; use None and build inside instead.",
  code:{py:`def greet(name, greeting="Hello"):
     print(greeting, name)
 greet("Sam")                 # Hello Sam
 greet("Ana", "Hi")           # Hi Ana`}},
 {id:"py-adv-keyword", cat:"Python Examples", title:"Adv. functions · Keyword parameters",
- desc:"Pass arguments by name, in any order.",
+ level:"intermediate", example_output:"5x2 filled with .\n3x3 filled with #",
+ desc:"Passing arguments by name (width=5, height=2) lets you supply them in any order and makes the call self-documenting — you can see which value means what. You can mix positional and keyword arguments, but every positional one must come before the keywords. This pairs naturally with default parameters, letting callers set just the options they care about.",
  code:{py:`def box(width, height, fill="."):
     print(f"{width}x{height} filled with {fill}")
 box(height=2, width=5)          # order-independent
 box(3, 3, fill="#")`}},
 {id:"py-adv-lambda", cat:"Python Examples", title:"Adv. functions · Anonymous functions (lambda)",
- desc:"A small inline function, often used as a key.",
+ level:"intermediate", example_output:"36\n[(3, 2), (1, 5), (2, 8)]",
+ desc:"lambda builds a small, unnamed function in a single expression — lambda x: x * x is just a compact def with an implicit return. Its main use is as a throwaway 'key' passed to functions like sorted(), max(), and min() to say what to compare by (here, each point's second item). For anything longer than one expression, a named def reads better.",
  code:{py:`square = lambda x: x * x       # tiny inline function
 print(square(6))               # 36
 pts = [(1, 5), (3, 2), (2, 8)]
 print(sorted(pts, key=lambda p: p[1]))   # sort by 2nd item`}},
 {id:"py-adv-methods", cat:"Python Examples", title:"Adv. functions · Method invocations",
- desc:"Methods are functions on an object, called with dot syntax.",
+ level:"intermediate", example_output:"HELLO\n[1, 2, 3]",
+ desc:"A method is a function that belongs to an object and is called with dot syntax: s.upper() runs the str type's upper on the string s, which is passed in automatically as the thing to act on. Some methods return a new value (str methods, since strings are immutable) while others mutate the object in place and return None (list.sort()) — know which is which.",
  code:{py:`s = "hello"
 print(s.upper())        # 'HELLO'
 nums = [3, 1, 2]
 nums.sort()             # method mutates the list
 print(nums)`}},
 {id:"py-adv-decorator", cat:"Python Examples", title:"Adv. functions · Function wrapping and decorators",
- desc:"A decorator wraps a function to extend its behavior.",
+ level:"advanced", example_output:"HI SAM",
+ desc:"A decorator is a function that takes a function and returns a new one wrapping it — adding behaviour before or after, or transforming the result (here shout upper-cases whatever greet returns). The @shout line above def greet is just sugar for greet = shout(greet). It's how features like caching, timing, and access checks get bolted onto functions without editing their bodies. (*args, **kwargs let the wrapper forward any arguments.)",
  code:{py:`def shout(func):                 # wraps another function
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs).upper()
