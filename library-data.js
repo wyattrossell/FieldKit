@@ -2632,11 +2632,11 @@ ORDER BY c1 ASC;   -- or DESC`}},
  code:{sql:`SELECT c1, c2 FROM t
 ORDER BY c1
 LIMIT n OFFSET offset;`}},
-{id:"sql-groupby", cat:"SQL", title:"GROUP BY (aggregate)", desc:"Collapse rows into groups and apply an aggregate (COUNT, SUM, ...) per group.",
+{id:"sql-groupby", cat:"SQL", title:"GROUP BY (aggregate)", level:"intermediate", example_output:"-- SELECT dept, COUNT(*), AVG(salary) FROM employees GROUP BY dept;\ndept  count  avg\nEng   2      91500\nOps   2      66000", desc:"GROUP BY collapses rows that share the same value(s) in the grouping columns into one group, then applies aggregate functions (COUNT, SUM, AVG, MIN, MAX) to each group. Every column in the SELECT must either appear in the GROUP BY or be wrapped in an aggregate — otherwise it's ambiguous which row's value to show. It runs after WHERE, so filter rows first, then group.",
  code:{sql:`SELECT c1, aggregate(c2)
 FROM t
 GROUP BY c1;`}},
-{id:"sql-having", cat:"SQL", title:"HAVING (filter groups)", desc:"Filter groups after aggregation. WHERE filters rows; HAVING filters groups.",
+{id:"sql-having", cat:"SQL", title:"HAVING (filter groups)", level:"intermediate", example_output:"-- ... GROUP BY dept HAVING AVG(salary) > 70000;\ndept  avg\nEng   91500", desc:"HAVING filters whole groups after aggregation, using conditions on aggregate results (HAVING COUNT(*) > 1). It's the group-level counterpart to WHERE: WHERE removes rows before grouping, HAVING removes groups after. Rule of thumb — put a condition in WHERE if it's about individual rows, in HAVING if it's about a group's aggregate. The order is WHERE, then GROUP BY, then HAVING.",
  code:{sql:`SELECT c1, aggregate(c2)
 FROM t
 GROUP BY c1
@@ -2833,7 +2833,7 @@ ON person FOR EACH ROW
 EXECUTE stored_procedure;`}},
 {id:"sql-drop-trigger", cat:"SQL", title:"DROP TRIGGER", desc:"Delete a trigger.",
  code:{sql:`DROP TRIGGER trigger_name;`}},
-{id:"sql-aggregates", cat:"SQL", title:"Aggregate functions", desc:"AVG, COUNT, SUM, MIN, MAX summarize a set of rows — usually paired with GROUP BY.",
+{id:"sql-aggregates", cat:"SQL", title:"Aggregate functions", level:"intermediate", example_output:"-- over the 4 employees:\nrow_count  average  total   smallest  largest\n4          78750    315000  60000     95000", desc:"Aggregate functions reduce many rows to one summary value: COUNT counts rows (COUNT(*) counts all, COUNT(col) skips NULLs), SUM and AVG total and average numbers, MIN and MAX find extremes. Alone they summarize the whole table; with GROUP BY they summarize each group. Note every aggregate except COUNT(*) ignores NULLs, which can quietly skew an AVG.",
  code:{sql:`SELECT
   COUNT(*) AS row_count,
   AVG(c2)  AS average,
