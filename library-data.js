@@ -1578,39 +1578,46 @@ joined = "-".join(["2024", "01", "15"])
 print(joined)                 # '2024-01-15'`}},
 
 {id:"py-for-loop", cat:"Python Examples", title:"For loops · The for loop",
- desc:"Run a block once for each item in a sequence.",
+ level:"beginner", example_output:"count: 1\ncount: 2\ncount: 3\ndone",
+ desc:"A for loop runs its indented block once for each item in a sequence, binding the loop variable to the current item each pass. It's the go-to when you know what you're iterating over — a list, a string, a range. Unlike a while loop you don't manage a counter; Python walks the items for you and stops automatically at the end.",
  code:{py:`for i in [1, 2, 3]:
     print("count:", i)
 print("done")`}},
 {id:"py-for-strings", cat:"Python Examples", title:"For loops · Iterating over strings",
- desc:"A string is iterable one character at a time.",
+ level:"beginner", example_output:"c\na\nt",
+ desc:"Strings are iterable, so a for loop hands you one character at a time. This is how you scan or transform text character by character — counting vowels, building a filtered copy, and so on. Each item is itself a one-character string (Python has no separate character type).",
  code:{py:`for ch in "cat":
     print(ch)          # c, a, t on separate lines`}},
 {id:"py-for-lists", cat:"Python Examples", title:"For loops · Iterating over lists",
- desc:"Loop directly over list elements.",
+ level:"beginner", example_output:"APPLE\nPEAR\nFIG",
+ desc:"Looping directly over a list gives you each element in turn — cleaner than indexing when you don't need the position. Here each fruit is upper-cased as it's visited. This 'for item in list' form is the most Pythonic way to process a collection; fall back to indices only when you specifically need them.",
  code:{py:`fruits = ["apple", "pear", "fig"]
 for fruit in fruits:
     print(fruit.upper())`}},
 {id:"py-for-range", cat:"Python Examples", title:"For loops · The range function",
- desc:"range(start, stop, step) generates a sequence of integers.",
+ level:"beginner", example_output:"[0, 1, 2, 3, 4]\n[2, 3, 4, 5, 6, 7]\n[0, 2, 4, 6, 8]\ni = 0\ni = 1\ni = 2",
+ desc:"range() produces a run of integers on demand: range(stop) counts 0 up to stop-1, range(start, stop) begins elsewhere, and range(start, stop, step) skips by step. It's lazy — it doesn't build the whole list in memory — which is why you wrap it in list() to see it. Pair it with for to repeat something a fixed number of times.",
  code:{py:`print(list(range(5)))        # [0, 1, 2, 3, 4]
 print(list(range(2, 8)))     # [2, 3, 4, 5, 6, 7]
 print(list(range(0, 10, 2))) # [0, 2, 4, 6, 8]
 for i in range(3):
     print("i =", i)`}},
 {id:"py-for-accumulator", cat:"Python Examples", title:"For loops · The accumulator pattern",
- desc:"Initialize a total, update it each pass, use it after the loop.",
+ level:"beginner", example_output:"sum: 21",
+ desc:"The accumulator pattern builds a result across a loop: start with an initial value (0 for a sum, 1 for a product, '' or [] for building text or lists), update it on each pass, then use it after the loop ends. It's the manual version of built-ins like sum(), and the mental model behind most 'compute one value from many' tasks.",
  code:{py:`total = 0                 # initialize accumulator
 for n in [4, 7, 1, 9]:
     total = total + n     # update each pass
 print("sum:", total)      # 21`}},
 {id:"py-for-index", cat:"Python Examples", title:"For loops · Traversal by index",
- desc:"Loop over range(len(seq)) when you need positions.",
+ level:"beginner", example_output:"0 a\n1 b\n2 c",
+ desc:"Sometimes you need each item's position as well as its value — for that, loop over range(len(seq)) and index in with seq[i]. Use it when the index itself matters (numbering output, comparing neighbours). When you want index and value together, enumerate(seq) is tidier, but this pattern makes the mechanics explicit.",
  code:{py:`letters = ["a", "b", "c"]
 for i in range(len(letters)):
     print(i, letters[i])      # index and value`}},
 {id:"py-for-nested", cat:"Python Examples", title:"For loops · Nested iteration",
- desc:"A loop inside a loop — the inner runs fully each outer pass.",
+ level:"beginner", example_output:"1x1=1  1x2=2  1x3=3  \n2x1=2  2x2=4  2x3=6  \n3x1=3  3x2=6  3x3=9  ",
+ desc:"Nesting one loop inside another lets you work over combinations — every pairing of the outer and inner sequences. The inner loop runs to completion on each single pass of the outer loop, so this prints a full multiplication grid: for each row, all its columns. Mind the indentation; it's what tells Python which loop a statement belongs to.",
  code:{py:`for row in range(1, 4):
     for col in range(1, 4):
         print(f"{row}x{col}={row*col}", end="  ")
