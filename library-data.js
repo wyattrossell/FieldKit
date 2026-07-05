@@ -2174,37 +2174,43 @@ def greet(name):
 print(greet("sam"))              # 'HI SAM'`}},
 
 {id:"py-sort-basics", cat:"Python Examples", title:"Sorting · sort and sorted",
- desc:"sorted() returns a new list; .sort() sorts in place.",
+ level:"beginner", example_output:"[1, 2, 3]\n[3, 1, 2]\n[1, 2, 3]",
+ desc:"Two ways to sort. sorted(iterable) returns a brand-new sorted list and leaves the original alone — it works on any iterable. list.sort() sorts the list in place and returns None (so don't write nums = nums.sort()). Use sorted() when you need the original order preserved or you're sorting something that isn't a list; use .sort() to reorder a list you own.",
  code:{py:`nums = [3, 1, 2]
 print(sorted(nums))     # [1, 2, 3]  new list
 print(nums)             # [3, 1, 2]  unchanged
 nums.sort()             # in place, returns None
 print(nums)             # [1, 2, 3]`}},
 {id:"py-sort-reverse", cat:"Python Examples", title:"Sorting · reverse parameter",
- desc:"reverse=True sorts high to low.",
+ level:"beginner", example_output:"[3, 2, 1]\n['c', 'b', 'a']",
+ desc:"Both sorted() and .sort() take reverse=True to order from high to low instead of the default low to high. It applies after any key computation, so you can sort by any criterion and simply flip the direction. For a plain reversal of an already-ordered sequence, slicing seq[::-1] is an alternative that doesn't re-sort.",
  code:{py:`nums = [1, 2, 3]
 print(sorted(nums, reverse=True))    # [3, 2, 1]
 words = ["b", "a", "c"]
 words.sort(reverse=True)
 print(words)                          # ['c', 'b', 'a']`}},
 {id:"py-sort-key", cat:"Python Examples", title:"Sorting · key parameter",
- desc:"key= sorts by a computed value for each item.",
+ level:"intermediate", example_output:"['kiwi', 'apple', 'banana']\n['apple', 'banana', 'kiwi']",
+ desc:"The key parameter takes a function applied to each item to produce the value it's sorted by — the items themselves aren't changed, only the comparison. key=len sorts by length, key=str.lower sorts text case-insensitively, and a lambda lets you sort by any field. Sorting is stable, so items with equal keys keep their original relative order.",
  code:{py:`words = ["banana", "kiwi", "apple"]
 print(sorted(words, key=len))          # by length
 print(sorted(words, key=str.lower))    # case-insensitive`}},
 {id:"py-sort-dict", cat:"Python Examples", title:"Sorting · Sorting a dictionary",
- desc:"Sort by key, or sort items() by value.",
+ level:"intermediate", example_output:"['Ana', 'Kim', 'Sam']\n[('Ana', 95), ('Sam', 88), ('Kim', 72)]",
+ desc:"Sorting a dict directly (sorted(scores)) sorts its keys, giving a plain list of keys in order. To sort by value, sort the items() pairs with a key that picks the value — key=lambda kv: kv[1] — optionally reversed for highest-first. This 'sort a dictionary by value' recipe is a classic; the pattern is: turn it into items(), then sort with a key.",
  code:{py:`scores = {"Sam": 88, "Ana": 95, "Kim": 72}
 print(sorted(scores))          # keys: ['Ana','Kim','Sam']
 print(sorted(scores.items(), key=lambda kv: kv[1], reverse=True))`}},
 {id:"py-sort-tiebreak", cat:"Python Examples", title:"Sorting · Breaking ties (secondary sort)",
- desc:"A tuple key sorts by the first field, then the second for ties.",
+ level:"intermediate", example_output:"[('Kim', 25), ('Ana', 30), ('Sam', 30)]",
+ desc:"To sort by more than one criterion, return a tuple from the key: Python compares tuples field by field, so (age, name) sorts by age first and uses name only to break ties. Order the fields by priority. To mix directions (age descending, name ascending) negate a numeric field, or sort in stable passes from least to most significant.",
  code:{py:`people = [("Sam", 30), ("Ana", 30), ("Kim", 25)]
 # sort by age, then name for ties:
 print(sorted(people, key=lambda p: (p[1], p[0])))`}},
 
 {id:"py-nest-complex-items", cat:"Python Examples", title:"Nested data · Lists with complex items",
- desc:"Lists whose items are themselves lists.",
+ level:"intermediate", example_output:"Sam avg: 87.5\nAna avg: 82.5",
+ desc:"Lists can hold anything, including other lists — here each item is a [name, grades] pair where grades is itself a list. Unpacking in the loop (for name, grades in students) names the parts, then you compute over the inner list. This 'list of records' shape is everywhere; when the structure gets deep, unpacking keeps the code readable.",
  code:{py:`students = [
     ["Sam", [90, 85]],
     ["Ana", [70, 95]],
@@ -2212,7 +2218,8 @@ print(sorted(people, key=lambda p: (p[1], p[0])))`}},
 for name, grades in students:
     print(name, "avg:", sum(grades) / len(grades))`}},
 {id:"py-nest-dicts", cat:"Python Examples", title:"Nested data · Nested dictionaries",
- desc:"Dicts of dicts; drill in with chained keys.",
+ level:"intermediate", example_output:"30\ndev",
+ desc:"Values in a dict can themselves be dicts (or lists), so you can model structured records and drill in by chaining keys: users['ana']['age'] reads the age inside ana's record, and adding [1] indexes into the roles list. Each bracket goes one level deeper. Guard against missing pieces with .get() at each level, since a wrong key anywhere raises KeyError.",
  code:{py:`users = {
     "sam": {"age": 42, "roles": ["admin"]},
     "ana": {"age": 30, "roles": ["user", "dev"]},
@@ -2220,7 +2227,8 @@ for name, grades in students:
 print(users["ana"]["age"])          # 30
 print(users["ana"]["roles"][1])     # 'dev'`}},
 {id:"py-nest-json", cat:"Python Examples", title:"Nested data · Processing JSON results",
- desc:"json.loads parses a JSON string into nested dicts/lists.",
+ level:"intermediate", example_output:"Sam\npy\n{\"name\": \"Sam\", \"langs\": [\"py\", \"js\"], \"active\": true}",
+ desc:"JSON is the standard text format for data on the web, and it maps cleanly onto Python's nested dicts and lists. json.loads(text) parses a JSON string into those structures (JSON's true/false/null become Python True/False/None), after which you navigate with the same key/index chaining. json.dumps(obj) does the reverse — the pair you'll use whenever you talk to an API.",
  code:{py:`import json
 text = '{"name": "Sam", "langs": ["py", "js"], "active": true}'
 data = json.loads(text)             # JSON -> Python
@@ -2228,14 +2236,16 @@ print(data["name"])                 # Sam
 print(data["langs"][0])             # py
 print(json.dumps(data))             # back to a JSON string`}},
 {id:"py-nest-iter", cat:"Python Examples", title:"Nested data · Nested iteration",
- desc:"Walk a 2-D structure with nested loops.",
+ level:"beginner", example_output:"1 2 3 \n4 5 6 ",
+ desc:"A grid or matrix is naturally a list of lists, and you walk it with nested loops: the outer loop takes one row, the inner loop visits each value in that row. The end=' ' keeps a row on one line, and the bare print() after the inner loop drops to the next line. The same two-level pattern processes tables, boards, and pixel arrays.",
  code:{py:`matrix = [[1, 2, 3], [4, 5, 6]]
 for row in matrix:
     for value in row:
         print(value, end=" ")
     print()`}},
 {id:"py-nest-copy", cat:"Python Examples", title:"Nested data · Deep vs. shallow copies",
- desc:"A shallow copy shares inner objects; deepcopy duplicates everything.",
+ level:"intermediate", example_output:"[[99, 2], [3, 4]]\n[[1, 2], [3, 4]]",
+ desc:"With nested data, copy depth matters. A shallow copy (a[:], list(a), .copy()) makes a new outer list but the inner lists are still shared — so editing shallow[0][0] also changes the original. copy.deepcopy() recursively duplicates everything, giving a fully independent structure. Rule of thumb: shallow is fine for flat data; use deepcopy when nested objects will be modified.",
  code:{py:`import copy
 a = [[1, 2], [3, 4]]
 shallow = a[:]                 # inner lists still shared
