@@ -1338,7 +1338,8 @@ dcdiag /q`
 /* ================= PYTHON EXAMPLES ================= */
 
 {id:"py-var-datatypes", cat:"Python Examples", title:"Basics · Values and data types",
- desc:"Every value has a type; inspect it with type().",
+ level:"beginner", example_output:"<class 'int'>\n<class 'float'>\n<class 'str'>\n<class 'bool'>\n<class 'list'>",
+ desc:"In Python every value has a type that decides what you can do with it — you can multiply two ints but not add a string to an int. The built-in type() reports it, which is invaluable when a bug turns out to be a value that isn't the type you assumed (a number that's secretly a string). The everyday types are int (whole numbers), float (decimals), str (text), bool (True/False), and containers like list.",
  code:{py:`# every value has a type
 print(type(42))        # <class 'int'>
 print(type(3.14))      # <class 'float'>
@@ -1346,7 +1347,8 @@ print(type("hi"))      # <class 'str'>
 print(type(True))      # <class 'bool'>
 print(type([1, 2]))    # <class 'list'>`}},
 {id:"py-var-operators", cat:"Python Examples", title:"Basics · Operators and operands",
- desc:"Arithmetic operators combine operands into a new value.",
+ level:"beginner", example_output:"10\n4\n21\n2.3333333333333335\n2\n1\n343",
+ desc:"Arithmetic operators take one or two operands and produce a new value. Two catch people out: / always gives a float (7/3 is 2.333…, not 2), while // does floor division; % (modulo) returns the remainder, handy for 'is it even?' (n % 2) or wrapping a range. ** is exponent.",
  code:{py:`print(7 + 3)     # 10   addition
 print(7 - 3)     # 4
 print(7 * 3)     # 21
@@ -1355,25 +1357,29 @@ print(7 // 3)    # 2    floor division
 print(7 % 3)     # 1    modulo (remainder)
 print(7 ** 3)    # 343  exponent`}},
 {id:"py-var-calls", cat:"Python Examples", title:"Basics · Function calls",
- desc:"A call runs a function and yields a value usable in a bigger expression.",
+ level:"beginner", example_output:"5\n9\n7",
+ desc:"A function call — a name followed by parentheses — runs that function and evaluates to its return value, which you can drop straight into a bigger expression. Here abs(-4) + round(2.7) becomes 4 + 3 = 7 before print ever sees it. Built-ins like len(), max(), abs(), and round() are vocabulary you'll reach for constantly.",
  code:{py:`print(len("hello"))            # 5
 print(max(3, 9, 2))            # 9
 print(abs(-4) + round(2.7))    # 4 + 3 = 7  (calls nested in an expression)`}},
 {id:"py-var-typeconv", cat:"Python Examples", title:"Basics · Type conversion functions",
- desc:"int(), float(), str(), bool() convert between types.",
+ level:"beginner", example_output:"43\n3.5\n100%\n3\nFalse True",
+ desc:"Type-conversion functions build a new value of one type from another: int(), float(), str(), bool(). Reach for them at the boundaries — turning the text from input() into a number, or a number into text so you can join it with +. Two gotchas: int() on a float truncates toward zero (int(3.9) is 3, not 4), and bool() is False only for 'empty' values like 0, '', and [] — everything else is True.",
  code:{py:`print(int("42") + 1)     # 43   str -> int
 print(float("3.5"))      # 3.5
 print(str(100) + "%")    # "100%"  int -> str
 print(int(3.9))          # 3    truncates toward zero
 print(bool(0), bool(2))  # False True`}},
 {id:"py-var-variables", cat:"Python Examples", title:"Basics · Variables",
- desc:"A variable is a name bound to a value.",
+ level:"beginner", example_output:"Hello 17 3.14159",
+ desc:"A variable is a name bound to a value with = — think of it as a label you stick on data so you can refer to it later. The name goes on the left, the value on the right. Reading a name that was never assigned raises NameError, so assign before you use. print() shows several values separated by spaces.",
  code:{py:`message = "Hello"
 n = 17
 pi = 3.14159
 print(message, n, pi)`}},
 {id:"py-var-names-keywords", cat:"Python Examples", title:"Basics · Variable names and keywords",
- desc:"Naming rules, and the reserved words you can't use as names.",
+ level:"beginner", example_output:"['False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'try', 'while', 'with', 'yield']",
+ desc:"Names may contain letters, digits, and underscores but can't start with a digit, and they're case-sensitive (count and Count differ). By convention variables use snake_case. Python reserves a set of keywords (if, for, class, import, …) that have special meaning and can't be used as names — keyword.kwlist prints the full list. A leading underscore (like _total) is legal and conventionally signals 'internal'.",
  code:{py:`# legal: letters, digits, underscore; cannot start with a digit
 count = 0
 _total = 0
@@ -1382,26 +1388,30 @@ user_name = "sam"
 import keyword
 print(keyword.kwlist)   # ['False','None','True','and', ...]`}},
 {id:"py-var-stmt-vs-expr", cat:"Python Examples", title:"Basics · Statements vs. expressions",
- desc:"An expression has a value; a statement performs an action.",
+ level:"beginner", example_output:"7\n13",
+ desc:"An expression is anything that evaluates to a value — 3 + 4, len(s), x * 2 — and can appear wherever a value is expected. A statement performs an action: an assignment, a print, an if. The distinction matters because an expression on its own line is legal but pointless (its value is computed, then thrown away), whereas assignments and calls are statements you run for their effect.",
  code:{py:`x = 3 + 4          # statement (assignment); 3 + 4 is an expression
 print(x)           # statement that calls print
 (3 + 4)            # an expression alone (value 7, but discarded)
 y = (x * 2) - 1    # expression evaluated, result assigned
 print(y)`}},
 {id:"py-var-precedence", cat:"Python Examples", title:"Basics · Order of operations",
- desc:"PEMDAS: parentheses, exponent, mul/div, add/sub (left to right).",
+ level:"beginner", example_output:"14\n20\n512\n3",
+ desc:"When an expression mixes operators, Python applies them in a fixed precedence — parentheses first, then **, then * / // %, then + - — scanning left to right among equals. The exception is **, which is right-associative, so 2**3**2 means 2**(3**2) = 512, not 64. Practical rule: when precedence isn't obvious at a glance, add parentheses; they're free and make intent unmistakable.",
  code:{py:`print(2 + 3 * 4)       # 14, not 20
 print((2 + 3) * 4)     # 20
 print(2 ** 3 ** 2)     # 512  (** is right-associative: 2**(3**2))
 print(10 - 4 - 3)      # 3    (left to right)`}},
 {id:"py-var-reassign", cat:"Python Examples", title:"Basics · Reassignment",
- desc:"A name can be rebound to a new value (even a new type).",
+ level:"beginner", example_output:"5\nnow a string",
+ desc:"Assignment rebinds a name, so the same variable can point at a new value later — and because Python is dynamically typed, the new value can even be a different type (an int becomes a str here). The name doesn't remember its old value; it simply points somewhere new. Convenient, but it means a variable's type can change as the program runs, so keep track of what a name holds.",
  code:{py:`x = 5
 print(x)             # 5
 x = "now a string"   # same name, new value
 print(x)             # now a string`}},
 {id:"py-var-update", cat:"Python Examples", title:"Basics · Updating variables",
- desc:"Read-modify-write, and the += / -= shorthands.",
+ level:"beginner", example_output:"2 75",
+ desc:"A very common pattern is to update a variable from its own current value — read it, change it, store the result back (count = count + 1). The augmented-assignment shorthands (+=, -=, *=, …) do exactly this in one step, so count += 1 is the same as count = count + 1, just shorter. These are the building blocks of counters and running totals.",
  code:{py:`count = 0
 count = count + 1     # read old value, add, store back
 count += 1            # shorthand for the same
@@ -1409,7 +1419,8 @@ total = 100
 total -= 25           # 75
 print(count, total)`}},
 {id:"py-var-input", cat:"Python Examples", title:"Basics · Input",
- desc:"input() reads a line from the keyboard and always returns a string.",
+ level:"beginner", example_output:"Your name: Ada\nHi Ada\nYour age: 41\nNext year: 42",
+ desc:"input() prints its optional prompt, waits for the user to type a line and press Enter, and returns what they typed as a string — always text, even if they type digits. To do math you must convert first: int(input(...)) or float(input(...)). Forgetting the conversion is the classic beginner bug — '42' + 1 raises TypeError because you can't add a number to a string.",
  code:{py:`# input() always returns a string
 name = input("Your name: ")
 print("Hi", name)
