@@ -2757,81 +2757,81 @@ WHERE c1 IS NULL;   -- or IS NOT NULL`}},
 );`}},
 
 /* ---------- modifying data ---------- */
-{id:"sql-insert-one", cat:"SQL", title:"INSERT one row", desc:"Add a single row to a table.",
+{id:"sql-insert-one", cat:"SQL", title:"INSERT one row", level:"beginner", example_output:"-- one new row written\n1 row affected.", desc:"INSERT INTO adds a new row: name the columns you're filling, then give a matching VALUES list in the same order. Columns you omit take their DEFAULT or NULL. Always listing the columns explicitly (rather than relying on table order) makes the statement robust if the schema later changes. The value order must line up with the column order exactly.",
  code:{sql:`INSERT INTO t (column_list)
 VALUES (value_list);`}},
-{id:"sql-insert-many", cat:"SQL", title:"INSERT multiple rows", desc:"Add several rows in a single statement.",
+{id:"sql-insert-many", cat:"SQL", title:"INSERT multiple rows", level:"beginner", example_output:"-- three rows written in one statement\n3 rows affected.", desc:"A single INSERT can add several rows by listing multiple parenthesized VALUES tuples separated by commas. This is much faster than running one INSERT per row because it's one statement, one round-trip, and often one transaction. Every tuple must match the column list. Very large batches may hit a packet or parameter limit, so extremely big loads are usually chunked.",
  code:{sql:`INSERT INTO t (column_list)
 VALUES
   (value_list),
   (value_list),
   (value_list);`}},
-{id:"sql-insert-select", cat:"SQL", title:"INSERT ... SELECT", desc:"Insert rows produced by a query over another table.",
+{id:"sql-insert-select", cat:"SQL", title:"INSERT ... SELECT", level:"intermediate", example_output:"-- rows from t2 copied into t1\n42 rows affected.", desc:"INSERT INTO ... SELECT copies rows from a query straight into a table instead of typing literal values — ideal for populating one table from another, archiving, or transforming data in bulk. The SELECT's columns must line up with the target column list in count and type. Because it's set-based, it moves many rows in one efficient statement.",
  code:{sql:`INSERT INTO t1 (column_list)
 SELECT column_list
 FROM t2;`}},
-{id:"sql-update-where", cat:"SQL", title:"UPDATE (with WHERE)", desc:"Change columns only in rows that match the condition.",
+{id:"sql-update-where", cat:"SQL", title:"UPDATE (with WHERE)", level:"beginner", example_output:"-- only rows matching the condition change\n3 rows affected.", desc:"UPDATE changes existing rows: SET assigns new values to one or more columns, and WHERE decides which rows are affected. The single most important habit is to always include a WHERE clause (and ideally test it first with a SELECT) — an UPDATE without one rewrites every row in the table. You can set several columns at once, separated by commas.",
  code:{sql:`UPDATE t
 SET c1 = new_value,
     c2 = new_value
 WHERE condition;`}},
-{id:"sql-update-all", cat:"SQL", title:"UPDATE all rows", desc:"Set a column for every row in the table.",
+{id:"sql-update-all", cat:"SQL", title:"UPDATE all rows", level:"intermediate", example_output:"-- EVERY row updated\n1000 rows affected.", desc:"An UPDATE with no WHERE clause applies the change to every row in the table. That's occasionally intentional — resetting a flag across the board — but it's also the classic catastrophic mistake, so treat a missing WHERE as a red flag. Run it inside a transaction (BEGIN ...) so you can ROLLBACK if the count of affected rows surprises you.",
  danger:"No WHERE clause — this changes every row.",
  code:{sql:`UPDATE t
 SET c1 = new_value;`}},
-{id:"sql-delete-where", cat:"SQL", title:"DELETE (with WHERE)", desc:"Delete only the rows matching a condition.",
+{id:"sql-delete-where", cat:"SQL", title:"DELETE (with WHERE)", level:"beginner", example_output:"-- matching rows removed\n5 rows affected.", desc:"DELETE FROM removes the rows that match the WHERE condition, leaving the table and the other rows intact. As with UPDATE, always specify WHERE and consider previewing the target rows with a SELECT first. Foreign-key references from other tables can block a delete or trigger cascading deletes, depending on how the relationship was defined.",
  code:{sql:`DELETE FROM t
 WHERE condition;`}},
-{id:"sql-delete-all", cat:"SQL", title:"DELETE all rows", desc:"Delete every row while keeping the table structure.",
+{id:"sql-delete-all", cat:"SQL", title:"DELETE all rows", level:"intermediate", example_output:"-- every row removed, table kept\n1000 rows affected.", desc:"DELETE FROM with no WHERE empties the entire table one row at a time, while keeping the table's structure. It's transactional and fires row triggers (so it can be rolled back), which is the difference from TRUNCATE — but for clearing a whole large table TRUNCATE is far faster. A WHERE-less DELETE is another statement to double-check before running.",
  danger:"No WHERE clause — this empties the whole table.",
  code:{sql:`DELETE FROM t;`}},
 
 /* ---------- views ---------- */
-{id:"sql-create-view", cat:"SQL", title:"CREATE VIEW", desc:"Save a query as a virtual table you can SELECT from.",
+{id:"sql-create-view", cat:"SQL", title:"CREATE VIEW", level:"intermediate", example_output:"-- creates a virtual table; query it like any table\nView 'v_active' created.", desc:"A view is a saved query that behaves like a virtual table: selecting from it runs its underlying SELECT each time, so it always reflects current data without storing a copy. Views simplify complex joins behind a friendly name and can restrict which columns or rows users see. Naming the view's columns (as here) is optional but documents the interface. Most views are read-only; simple ones can sometimes be updated.",
  code:{sql:`CREATE VIEW v (c1, c2) AS
 SELECT c1, c2
 FROM t;`}},
-{id:"sql-view-check-option", cat:"SQL", title:"CREATE VIEW ... WITH CHECK OPTION", desc:"A view that rejects INSERT/UPDATE which would produce rows outside its WHERE clause.",
+{id:"sql-view-check-option", cat:"SQL", title:"CREATE VIEW ... WITH CHECK OPTION", level:"advanced", example_output:"-- writes that violate the view's WHERE are rejected\nView created with check option.", desc:"WITH CHECK OPTION makes an updatable view enforce its own WHERE clause on writes: any INSERT or UPDATE through the view that would produce a row the view can't 'see' is rejected. Without it, you could insert a row that immediately vanishes from the view. LOCAL checks only this view's condition; CASCADED (often the default) also checks the conditions of any views this one is built on.",
  code:{sql:`CREATE VIEW v (c1, c2) AS
 SELECT c1, c2
 FROM t
 WITH [CASCADED | LOCAL] CHECK OPTION;`}},
-{id:"sql-recursive-view", cat:"SQL", title:"CREATE RECURSIVE VIEW", desc:"A view defined in terms of itself (anchor + recursive part). Most engines use a WITH RECURSIVE CTE instead.",
+{id:"sql-recursive-view", cat:"SQL", title:"CREATE RECURSIVE VIEW", level:"advanced", example_output:"-- expands a hierarchy level by level until exhausted\nid  name       lvl\n1   CEO        1\n2   VP Eng     2\n3   Engineer   3", desc:"A recursive view repeatedly applies itself to walk hierarchical or graph data — organization charts, bill-of-materials, category trees. It has two parts joined by UNION: an anchor (the starting rows) and a recursive member (which references the view to expand the next level), stopping when the recursive part yields no new rows. Most engines express the same idea with a recursive CTE (WITH RECURSIVE).",
  code:{sql:`CREATE RECURSIVE VIEW v AS
   select_statement        -- anchor part
 UNION [ALL]
   select_statement;       -- recursive part`}},
-{id:"sql-temp-view", cat:"SQL", title:"CREATE TEMPORARY VIEW", desc:"A view scoped to the current session; it disappears on disconnect.",
+{id:"sql-temp-view", cat:"SQL", title:"CREATE TEMPORARY VIEW", level:"intermediate", example_output:"-- session-only; vanishes on disconnect\nTemporary view 'v_tmp' created.", desc:"A TEMPORARY (or TEMP) view exists only for the current database session and disappears automatically when you disconnect; it's visible only to that session. It's handy for breaking a complicated one-off analysis into readable named steps without leaving a permanent object behind. Like other views it stores no data — just the query definition.",
  code:{sql:`CREATE TEMPORARY VIEW v AS
 SELECT c1, c2
 FROM t;`}},
-{id:"sql-drop-view", cat:"SQL", title:"DROP VIEW", desc:"Delete a view. The underlying table data is untouched.",
+{id:"sql-drop-view", cat:"SQL", title:"DROP VIEW", level:"beginner", example_output:"View 'v_active' dropped — underlying tables untouched.", desc:"DROP VIEW removes a view's definition. Because a view stores no data of its own, dropping it discards only the saved query — the underlying tables and their rows are untouched. Add IF EXISTS to avoid an error when it's already gone. Other views or code that referenced this view will break until updated.",
  code:{sql:`DROP VIEW view_name;`}},
 
 /* ---------- indexes ---------- */
-{id:"sql-create-index", cat:"SQL", title:"CREATE INDEX", desc:"Speed up lookups/sorts on one or more columns (at the cost of slower writes).",
+{id:"sql-create-index", cat:"SQL", title:"CREATE INDEX", level:"intermediate", example_output:"-- speeds up lookups on (c1, c2)\nIndex 'idx_name' created.", desc:"An index is a sorted lookup structure the database maintains alongside a table so it can find rows by the indexed column(s) without scanning everything — the main tool for speeding up WHERE filters, JOINs, and ORDER BY. A multi-column index (c1, c2) helps queries that filter on c1, or on c1 and c2, in that left-to-right order. The trade-off: each index adds storage and slightly slows INSERT/UPDATE/DELETE, since it must be kept in sync.",
  code:{sql:`CREATE INDEX idx_name
 ON t (c1, c2);`}},
-{id:"sql-unique-index", cat:"SQL", title:"CREATE UNIQUE INDEX", desc:"An index that also enforces uniqueness on the indexed columns.",
+{id:"sql-unique-index", cat:"SQL", title:"CREATE UNIQUE INDEX", level:"intermediate", example_output:"-- fast lookups AND no duplicate (c3, c4)\nUnique index 'idx_name' created.", desc:"A UNIQUE index does two jobs at once: it speeds up lookups like any index, and it forbids duplicate values in the indexed column(s) — which is in fact how engines enforce UNIQUE constraints under the hood. Creating one on existing data fails if duplicates are already present. Most engines still allow multiple NULLs in a unique index, since NULLs aren't considered equal to each other.",
  code:{sql:`CREATE UNIQUE INDEX idx_name
 ON t (c3, c4);`}},
-{id:"sql-drop-index", cat:"SQL", title:"DROP INDEX", desc:"Remove an index. Syntax varies (some need ON table).",
+{id:"sql-drop-index", cat:"SQL", title:"DROP INDEX", level:"beginner", example_output:"Index 'idx_name' dropped — table data unaffected.", desc:"DROP INDEX removes an index. The table's data is unaffected — you're only discarding the auxiliary lookup structure — but queries that relied on it may slow down, so drop indexes deliberately (for instance, an unused one that's just costing write performance). Dialect note: syntax differs — some engines want DROP INDEX name ON table, others DROP INDEX name, and a unique index backing a constraint may need the constraint dropped instead.",
  code:{sql:`DROP INDEX idx_name;`}},
 
 /* ---------- triggers & aggregates ---------- */
-{id:"sql-create-trigger", cat:"SQL", title:"CREATE TRIGGER", desc:"Run a stored procedure automatically on a table event. 'MODIFY' isn't standard — most engines use CREATE OR REPLACE / CREATE OR ALTER.",
+{id:"sql-create-trigger", cat:"SQL", title:"CREATE TRIGGER", level:"advanced", example_output:"-- fires automatically on the chosen event\nTrigger 'trigger_name' created.", desc:"A trigger is code the database runs automatically in response to INSERT, UPDATE, or DELETE on a table. You choose the timing (BEFORE the change, to validate or adjust the incoming row, or AFTER, to cascade effects) and the granularity (FOR EACH ROW, or once per statement). Triggers are powerful for auditing and enforcing rules, but because they fire invisibly they can make behaviour hard to debug — use them sparingly and document them.",
  code:{sql:`CREATE OR REPLACE TRIGGER trigger_name
   { BEFORE | AFTER }             -- when
   { INSERT | UPDATE | DELETE }   -- event
   ON table_name
   FOR EACH ROW                   -- or FOR EACH STATEMENT
 EXECUTE stored_procedure;`}},
-{id:"sql-trigger-example", cat:"SQL", title:"CREATE TRIGGER (example)", desc:"Fire a procedure before each new row is inserted into person.",
+{id:"sql-trigger-example", cat:"SQL", title:"CREATE TRIGGER (example)", level:"advanced", example_output:"-- runs for each row just before it enters person\nTrigger 'before_insert_person' created.", desc:"This concrete trigger runs before every row is inserted into person — a common place to validate or normalize data, for instance rejecting a negative age, filling a created_at timestamp, or lowercasing an email. BEFORE triggers can modify the incoming row (via NEW in MySQL/PostgreSQL) before it's written; AFTER triggers see the final row and are used to update other tables. The exact body syntax varies significantly by engine.",
  code:{sql:`CREATE TRIGGER before_insert_person
 BEFORE INSERT
 ON person FOR EACH ROW
 EXECUTE stored_procedure;`}},
-{id:"sql-drop-trigger", cat:"SQL", title:"DROP TRIGGER", desc:"Delete a trigger.",
+{id:"sql-drop-trigger", cat:"SQL", title:"DROP TRIGGER", level:"beginner", example_output:"Trigger 'trigger_name' dropped — table data unaffected.", desc:"DROP TRIGGER removes a trigger so the associated table no longer runs that automatic code on its events. The table and its data are unaffected. This is worth knowing when a trigger is causing unexpected side effects during bulk loads — temporarily dropping (or disabling) it can speed up or unblock the operation, after which you recreate it. Some engines require the table name too (DROP TRIGGER name ON table).",
  code:{sql:`DROP TRIGGER trigger_name;`}},
 {id:"sql-aggregates", cat:"SQL", title:"Aggregate functions", level:"intermediate", example_output:"-- over the 4 employees:\nrow_count  average  total   smallest  largest\n4          78750    315000  60000     95000", desc:"Aggregate functions reduce many rows to one summary value: COUNT counts rows (COUNT(*) counts all, COUNT(col) skips NULLs), SUM and AVG total and average numbers, MIN and MAX find extremes. Alone they summarize the whole table; with GROUP BY they summarize each group. Note every aggregate except COUNT(*) ignores NULLs, which can quietly skew an AVG.",
  code:{sql:`SELECT
