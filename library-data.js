@@ -1817,12 +1817,14 @@ for word in ["Portable", "Network", "Graphics"]:
 print(acronym)                     # 'PNG'`}},
 
 {id:"py-file-read", cat:"Python Examples", title:"Files · Reading a file",
- desc:"read() loads the whole file into one string. Needs the file to exist.",
+ level:"beginner", example_output:"(with a notes.txt that contains two lines)\nBuy milk\nCall the vet",
+ desc:"open() connects your program to a file; the 'r' mode means read-only, and read() slurps the entire contents into one string. Always pair open() with 'with' so the file is closed for you. The file must already exist or you get FileNotFoundError. read() is fine for small files, but for large ones prefer looping line by line so you don't load everything into memory.",
  code:{py:`with open("notes.txt", "r") as f:
     contents = f.read()
 print(contents)`}},
 {id:"py-file-read-alt", cat:"Python Examples", title:"Files · Alternative file-reading methods",
- desc:"readline() reads one line; readlines() returns a list of lines.",
+ level:"beginner", example_output:"(reading a 2-line notes.txt)\nBuy milk\n2 lines",
+ desc:"Besides read(), two methods give finer control. readline() returns just the next line (including its trailing newline, which is why you often rstrip() it), advancing a hidden cursor each call. readlines() returns a list of all lines at once — convenient, but it loads the whole file. Reopen or seek(0) to read again, since the cursor doesn't rewind on its own.",
  code:{py:`with open("notes.txt", "r") as f:
     line = f.readline()      # one line (keeps trailing newline)
     print(line.rstrip())
@@ -1830,31 +1832,36 @@ with open("notes.txt", "r") as f:
     lines = f.readlines()    # list of all lines
     print(len(lines), "lines")`}},
 {id:"py-file-iter", cat:"Python Examples", title:"Files · Iterating over lines in a file",
- desc:"Loop the file object directly — memory-friendly.",
+ level:"beginner", example_output:"(printing each line of notes.txt)\nBuy milk\nCall the vet",
+ desc:"The most Pythonic way to process a text file is to loop over the file object directly — for line in f — which hands you one line at a time and, crucially, doesn't load the whole file into memory. That makes it safe even for huge logs. Each line keeps its trailing newline, so rstrip() it before printing to avoid blank gaps.",
  code:{py:`with open("notes.txt", "r") as f:
     for line in f:                 # line by line
         print(line.rstrip())       # rstrip drops the newline`}},
 {id:"py-file-with", cat:"Python Examples", title:"Files · Using with (context manager)",
- desc:"with auto-closes the file, even if an error occurs.",
+ level:"beginner", example_output:"closed? True",
+ desc:"The with statement (a context manager) guarantees the file is closed when the block ends — even if an exception is raised inside it — so you never leak an open handle or lose buffered writes. Afterwards f.closed is True. Always prefer 'with open(...) as f:' over a bare open(); it's the difference between reliable cleanup and hoping you remembered to call f.close().",
  code:{py:`with open("notes.txt", "r") as f:
     data = f.read()
 # f is closed automatically here
 print("closed?", f.closed)         # True`}},
 {id:"py-file-write", cat:"Python Examples", title:"Files · Writing text files",
- desc:"Open in 'w' (truncate/create) or 'a' (append), then write().",
+ level:"beginner", example_output:"wrote out.txt",
+ desc:"To create or change a file, open it in a writing mode: 'w' truncates an existing file (or creates a new one) and starts fresh, while 'a' appends to the end without erasing. write() writes exactly the string you give it — it does not add line breaks, so include a newline (\\n) yourself. Opening in 'w' is destructive, so be sure before you overwrite.",
  danger:"Creates/overwrites out.txt in the working directory.",
  code:{py:`with open("out.txt", "w") as f:
     f.write("line one\\n")
     f.write("line two\\n")
 print("wrote out.txt")`}},
 {id:"py-file-csv-format", cat:"Python Examples", title:"Files · CSV format",
- desc:"Comma-separated values: one record per line, fields split on commas.",
+ level:"beginner", example_output:"['name', 'age', 'city']\n['Sam', '42', 'Denver']\n['Ana', '30', 'Reno']",
+ desc:"CSV (comma-separated values) is the plain-text spreadsheet format: one record per line, fields separated by commas, usually with a header row of column names. You can parse simple CSV by hand — split on newlines, then split each line on commas — which is a good way to see its shape. Real CSV has quoting and edge cases, so the csv module is safer for anything beyond toy data.",
  code:{py:`sample = "name,age,city\\nSam,42,Denver\\nAna,30,Reno"
 for line in sample.split("\\n"):
     fields = line.split(",")
     print(fields)`}},
 {id:"py-file-csv-read", cat:"Python Examples", title:"Files · Reading data from a CSV",
- desc:"csv.reader yields each row as a list of strings.",
+ level:"intermediate", example_output:"columns: ['name', 'age']\n['Sam', '42']\n['Ana', '30']",
+ desc:"The csv module reads CSV correctly, handling quoted fields and embedded commas that a naive split() would mangle. csv.reader(f) yields each row as a list of strings; next(reader) grabs the header row, then the loop walks the data rows. Open the file with newline='' (as the csv docs advise) so line endings are handled properly across platforms.",
  code:{py:`import csv
 with open("people.csv", newline="") as f:
     reader = csv.reader(f)
@@ -1863,7 +1870,8 @@ with open("people.csv", newline="") as f:
     for row in reader:
         print(row)                 # each row is a list of strings`}},
 {id:"py-file-csv-write", cat:"Python Examples", title:"Files · Writing data to a CSV",
- desc:"csv.writer serializes rows correctly (quoting, commas).",
+ level:"intermediate", example_output:"wrote people.csv",
+ desc:"csv.writer serializes rows to CSV properly — quoting any field that contains a comma or quote so the file stays valid. writerow(row) writes one row; writerows(rows) writes many at once. As with reading, open the file with newline='' to avoid stray blank lines on Windows. Numbers are converted to their text form automatically.",
  danger:"Creates/overwrites people.csv in the working directory.",
  code:{py:`import csv
 rows = [["name", "age"], ["Sam", 42], ["Ana", 30]]
