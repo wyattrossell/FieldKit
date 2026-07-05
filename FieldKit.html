@@ -13,7 +13,7 @@
 <style>
   :root{
     --bg:#12161b; --panel:#1a1f27; --panel2:#20262f; --edge:#2f3743; --edge2:#3c4654;
-    --ink:#e8e3d7; --muted:#8a94a0; --faint:#5b646f;
+    --ink:#e8e3d7; --muted:#8a94a0; --faint:#858e9b;
     --amber:#e3a83f; --amber-dim:#8a6a24; --teal:#57b6bd; --red:#d9744f; --green:#7fb069;
     --mono:ui-monospace,"Cascadia Code","Cascadia Mono",Consolas,"SF Mono","DejaVu Sans Mono",monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -21,13 +21,13 @@
   /* ---------- color theme presets (data-theme on <html>) ---------- */
   :root[data-theme="slate"]{
     --bg:#0f141a; --panel:#161c24; --panel2:#1c242e; --edge:#2a333f; --edge2:#38414f;
-    --ink:#e6ebf2; --muted:#8b96a5; --faint:#586474;
+    --ink:#e6ebf2; --muted:#8b96a5; --faint:#838e9e;
     --amber:#5aa9e6; --amber-dim:#2f5f86; --teal:#57b6bd; --red:#e06b6b; --green:#6fbf8f;
   }
   :root[data-theme="paper"]{
     color-scheme:light;
     --bg:#f4f1ea; --panel:#ffffff; --panel2:#ece7dd; --edge:#d9d2c4; --edge2:#c4bdae;
-    --ink:#2a2620; --muted:#6b6456; --faint:#9a9384;
+    --ink:#2a2620; --muted:#6b6456; --faint:#676253;
     --amber:#b5791a; --amber-dim:#d9b877; --teal:#2f7d84; --red:#c2542f; --green:#4f7d3a;
   }
   :root[data-theme="contrast"]{
@@ -37,7 +37,7 @@
   }
   :root[data-theme="green"]{
     --bg:#0a0f0a; --panel:#0f160f; --panel2:#141d14; --edge:#1f2d1f; --edge2:#2c3f2c;
-    --ink:#c8e6c8; --muted:#7fae7f; --faint:#557555;
+    --ink:#c8e6c8; --muted:#7fae7f; --faint:#6f906f;
     --amber:#5fe35f; --amber-dim:#2f7a2f; --teal:#57bda0; --red:#e0864f; --green:#7fd069;
   }
   *{box-sizing:border-box}
@@ -425,15 +425,15 @@
     <input id="q" type="text" placeholder="search tasks, e.g. hash, ping, admin, prefetch…" autocomplete="off" aria-label="Search tasks">
   </label>
   <select class="toolbtn" id="catSel" title="Category" aria-label="Category"></select>
-  <div class="langfilter" id="langfilter">
-    <button data-l="all" class="on">ALL</button>
-    <button data-l="ps">PS</button>
-    <button data-l="cmd">CMD</button>
-    <button data-l="mac">MAC</button>
-    <button data-l="linux">LINUX</button>
-    <button data-l="py">PY</button>
+  <div class="langfilter" id="langfilter" role="group" aria-label="Filter by language">
+    <button data-l="all" class="on" aria-label="All languages">ALL</button>
+    <button data-l="ps" aria-label="PowerShell">PS</button>
+    <button data-l="cmd" aria-label="Windows CMD">CMD</button>
+    <button data-l="mac" aria-label="macOS">MAC</button>
+    <button data-l="linux" aria-label="Linux">LINUX</button>
+    <button data-l="py" aria-label="Python">PY</button>
   </div>
-  <button class="toolbtn ostoggle" id="osDetectBtn" title="When on, each command opens on your OS's shell tab" aria-pressed="true">⌖ OS</button>
+  <button class="toolbtn ostoggle" id="osDetectBtn" title="When on, each command opens on your OS's shell tab" aria-label="Default to my OS's shell tab" aria-pressed="true">⌖ OS</button>
   <select class="toolbtn compact" id="teamSel" title="Filter by team" aria-label="Filter by team">
     <option value="all">All teams</option>
     <option value="blue">🔵 Blue</option>
@@ -486,7 +486,7 @@
 
 <!-- runbooks modal -->
 <div class="scrim" id="rbScrim">
-  <div class="modal rbmodal">
+  <div class="modal rbmodal" role="dialog" aria-modal="true" aria-label="Runbooks">
     <div class="rb-head">
       <h3>▶ Runbooks</h3>
       <button class="btn ghost" id="rb-close">Close</button>
@@ -499,7 +499,7 @@
 
 <!-- add modal -->
 <div class="scrim" id="scrim">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-heading">
     <h3 id="m-heading">Add a snippet</h3>
     <p class="sub">Auto-saved on this computer. Use <b>Data ▾ → Save file</b> to keep them on the USB stick so they travel to other PCs (<b>Load file</b> there).</p>
     <div class="field"><label>Task name</label><input id="m-title" placeholder="Reset a stuck print spooler"></div>
@@ -756,17 +756,20 @@ function renderTagBar(){
   const shown = overflow ? tags.slice(0,TAG_CAP) : tags.slice();
   activeTags.forEach(t=>{ if(!shown.includes(t)) shown.push(t); }); // active tags always shown
   let html=`<span class="lbl">Tags</span>`;
-  html+=shown.map(t=>`<span class="t ${activeTags.has(t)?'on':''}" data-t="${esc(t)}">${esc(t)} <span class="c">${universe[t]}</span></span>`).join("");
-  if(overflow) html+=`<span class="more" id="tagMore">+${tags.length-TAG_CAP} more</span>`;
-  else if(tags.length>TAG_CAP) html+=`<span class="more" id="tagLess">show fewer</span>`;
-  if(activeTags.size) html+=`<span class="clear" id="tagClear">clear</span>`;
+  html+=shown.map(t=>`<span class="t ${activeTags.has(t)?'on':''}" data-t="${esc(t)}" role="button" tabindex="0" aria-pressed="${activeTags.has(t)?'true':'false'}">${esc(t)} <span class="c">${universe[t]}</span></span>`).join("");
+  if(overflow) html+=`<span class="more" id="tagMore" role="button" tabindex="0">+${tags.length-TAG_CAP} more</span>`;
+  else if(tags.length>TAG_CAP) html+=`<span class="more" id="tagLess" role="button" tabindex="0">show fewer</span>`;
+  if(activeTags.size) html+=`<span class="clear" id="tagClear" role="button" tabindex="0">clear</span>`;
   tagbarEl.innerHTML=html;
   tagbarEl.querySelectorAll(".t").forEach(el=>{
-    el.onclick=()=>{ const t=el.dataset.t; activeTags.has(t)?activeTags.delete(t):activeTags.add(t); renderTagBar(); renderList(); };
+    const toggle=()=>{ const t=el.dataset.t; activeTags.has(t)?activeTags.delete(t):activeTags.add(t); renderTagBar(); renderList(); };
+    el.onclick=toggle;
+    el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(); } };
   });
-  const more=$("#tagMore"); if(more) more.onclick=()=>{ tagsExpanded=true; renderTagBar(); };
-  const less=$("#tagLess"); if(less) less.onclick=()=>{ tagsExpanded=false; renderTagBar(); };
-  const clr=$("#tagClear"); if(clr) clr.onclick=()=>{ activeTags.clear(); renderTagBar(); renderList(); };
+  const kb=(el,fn)=>{ if(!el) return; el.onclick=fn; el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fn(); } }; };
+  kb($("#tagMore"), ()=>{ tagsExpanded=true; renderTagBar(); });
+  kb($("#tagLess"), ()=>{ tagsExpanded=false; renderTagBar(); });
+  kb($("#tagClear"), ()=>{ activeTags.clear(); renderTagBar(); renderList(); });
 }
 
 // ---- runbooks: named, ordered lists of commands, exportable as one script ----
@@ -855,8 +858,8 @@ function openCopyViewPicker(btn){
 function rbNew(){ const nm=(prompt("New runbook name:","Runbook "+(runbookCount()+1))||"").trim(); if(!nm) return; const name=runbooks[nm]!==undefined?uniqueRunbookName(nm):nm; runbooks[name]=[]; activeRunbook=name; saveRunbooks(); updateRunbookCount(); renderRunbookModal(); }
 function rbRename(){ if(!activeRunbook) return; const nm=(prompt("Rename runbook:",activeRunbook)||"").trim(); if(!nm||nm===activeRunbook) return; const name=runbooks[nm]!==undefined?uniqueRunbookName(nm):nm; runbooks[name]=runbooks[activeRunbook]; delete runbooks[activeRunbook]; activeRunbook=name; saveRunbooks(); renderRunbookModal(); }
 function rbDelete(){ if(!activeRunbook) return; if(!confirm(`Delete runbook “${activeRunbook}”?`)) return; delete runbooks[activeRunbook]; activeRunbook=Object.keys(runbooks)[0]||null; saveRunbooks(); updateRunbookCount(); renderRunbookModal(); }
-function openRunbooks(){ renderRunbookModal(); $("#rbScrim").classList.add("open"); }
-function closeRunbooks(){ $("#rbScrim").classList.remove("open"); }
+function openRunbooks(){ renderRunbookModal(); $("#rbScrim").classList.add("open"); const c=$("#rb-close"); if(c) c.focus(); }
+function closeRunbooks(){ $("#rbScrim").classList.remove("open"); const b=$("#runbookBtn"); if(b) b.focus(); }
 function renderRunbookModal(){
   const box=$("#rb-body"); if(!box) return;
   const names=Object.keys(runbooks);
@@ -906,8 +909,8 @@ function attackCoverage(){
   library.forEach(e=>{ (e.attack||[]).forEach(t=>{ if(!/^T\d{4}(\.\d{3})?$/.test(t)) return; if(!map[t]) map[t]={count:0,detect:0}; map[t].count++; if(e.detect) map[t].detect++; }); });
   return map;
 }
-function openAttack(){ renderAttackModal(); $("#atkScrim").classList.add("open"); }
-function closeAttack(){ $("#atkScrim").classList.remove("open"); }
+function openAttack(){ renderAttackModal(); $("#atkScrim").classList.add("open"); const c=$("#atk-close"); if(c) c.focus(); }
+function closeAttack(){ $("#atkScrim").classList.remove("open"); const b=$("#attackBtn"); if(b) b.focus(); }
 function renderAttackModal(){
   const box=$("#atk-body"); if(!box) return;
   const map=attackCoverage();
@@ -1116,7 +1119,7 @@ function renderDetail(){
   const tabLangs=usesCore ? CORE.concat(avail.filter(l=>!CORE.includes(l))) : avail;
   const tabs=tabLangs.map(l=>{
     const on=l===selectedLang, ok=item.code[l];
-    return `<div class="tab ${on?'on':''} ${ok?'':'disabled'}" data-l="${l}">${LANGS[l].name}</div>`;
+    return `<div class="tab ${on?'on':''} ${ok?'':'disabled'}" data-l="${l}" role="tab" aria-selected="${on?'true':'false'}" ${ok?`tabindex="${on?0:-1}"`:'aria-disabled="true" tabindex="-1"'}>${LANGS[l].name}</div>`;
   }).join("");
   const meta=LANGS[selectedLang];
   const raw=item.code[selectedLang];
@@ -1133,7 +1136,7 @@ function renderDetail(){
     </div>` : "";
   detailEl.innerHTML=`
     ${headBlock(item)}
-    <div class="tabs">${tabs}</div>
+    <div class="tabs" role="tablist" aria-label="Command language">${tabs}</div>
     ${phbar}
     <div class="codewrap">
       <div class="codebar">
@@ -1154,9 +1157,19 @@ function renderDetail(){
   detailEl.querySelectorAll(".phf input").forEach(inp=>{
     inp.oninput=()=>{ phValues[inp.dataset.ph]=inp.value; paint(); };
   });
-  detailEl.querySelectorAll(".tab").forEach(t=>{
-    if(t.classList.contains("disabled")) return;
+  const enabledTabs=[...detailEl.querySelectorAll(".tab:not(.disabled)")];
+  enabledTabs.forEach(t=>{
     t.onclick=()=>{ selectedLang=t.dataset.l; renderDetail(); };
+    t.onkeydown=e=>{
+      if(e.key==="Enter"||e.key===" "){ e.preventDefault(); selectedLang=t.dataset.l; renderDetail(); return; }
+      if(e.key==="ArrowRight"||e.key==="ArrowLeft"){
+        e.preventDefault();
+        const i=enabledTabs.indexOf(t); const n=enabledTabs.length;
+        const nx=enabledTabs[(i+(e.key==="ArrowRight"?1:n-1))%n];
+        selectedLang=nx.dataset.l; renderDetail();
+        const el=detailEl.querySelector(".tab.on"); if(el) el.focus();
+      }
+    };
   });
   $("#editBtn").onclick=()=>openModal(item.id);
   $("#copyBtn").onclick=()=>copyText(fillTemplate(raw, phValues), $("#copyBtn"));
@@ -1564,6 +1577,7 @@ async function tryReconnectFile(){
 document.addEventListener("keydown", e=>{
   const tag=(e.target.tagName||"").toLowerCase();
   const typing = tag==="input"||tag==="textarea"||tag==="select";
+  if($("#copyViewPop")){ if(e.key==="Escape"){ closeCopyViewPicker(); return; } }
   if($("#atkScrim").classList.contains("open")){ if(e.key==="Escape") closeAttack(); return; }
   if($("#rbScrim").classList.contains("open")){ if(e.key==="Escape") closeRunbooks(); return; }
   if(scrim.classList.contains("open")){ if(e.key==="Escape") closeModal(); return; }
