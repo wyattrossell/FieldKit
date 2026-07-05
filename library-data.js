@@ -1429,40 +1429,46 @@ age = int(input("Your age: "))
 print("Next year:", age + 1)`}},
 
 {id:"py-err-syntax", cat:"Python Examples", title:"Errors · Syntax errors",
- desc:"Malformed code Python can't parse; the program won't start.",
+ level:"beginner", example_output:"Fix the punctuation, then the file will run.",
+ desc:"A syntax error means Python can't even parse your code — it's grammatically wrong, so nothing runs, not even the correct lines above it. Typical causes are an unclosed bracket, a missing colon after if/for/def, or a stray quote. Because the whole file is rejected up front, fix the punctuation the message points at and try again. (The broken examples here are commented out so the file still runs.)",
  code:{py:`# a syntax error stops the program before it runs (shown here as comments)
 # print("hi"      <- SyntaxError: '(' was never closed
 # if x  == 1      <- SyntaxError: expected ':'
 print("Fix the punctuation, then the file will run.")`}},
 {id:"py-err-runtime", cat:"Python Examples", title:"Errors · Runtime errors",
- desc:"Errors raised while running, at a specific line (exceptions).",
+ level:"beginner", example_output:"5.0",
+ desc:"A runtime error (an exception) happens while the program is running, at a specific line — the code parsed fine, but something went wrong as it executed, like indexing past the end of a list or dividing by zero. Everything before the failing line runs normally, and the traceback names the exception type and line. You handle these with try/except, not by fixing punctuation.",
  code:{py:`nums = [1, 2, 3]
 # print(nums[5])   # IndexError at runtime
 print(10 / 2)      # runs fine
 # print(10 / 0)    # ZeroDivisionError at runtime`}},
 {id:"py-err-semantic", cat:"Python Examples", title:"Errors · Semantic errors",
- desc:"Runs without error but produces the wrong answer (a logic bug).",
+ level:"beginner", example_output:"4.0\n3.0",
+ desc:"A semantic (logic) error is the sneakiest kind: the program runs to completion without complaint but gives the wrong answer. Here 2 + 4 / 2 divides before it adds (operator precedence), so you get 4.0 instead of the intended average 3.0. Nothing crashes, so you only catch it by checking results — which is exactly why tests and worked examples matter.",
  code:{py:`# want the average of 2 and 4:
 avg = 2 + 4 / 2      # BUG: gives 4.0 (precedence), not 3.0
 print(avg)           # 4.0  <- wrong
 avg = (2 + 4) / 2    # fixed
 print(avg)           # 3.0`}},
 {id:"py-err-syntaxerror", cat:"Python Examples", title:"Errors · SyntaxError",
- desc:"Common causes of the SyntaxError Python raises at parse time.",
+ level:"beginner", example_output:"the examples above are shown as comments so this file still runs",
+ desc:"SyntaxError is the specific exception Python raises at parse time when it hits something it can't read as valid Python. The usual culprits are a missing colon, unbalanced parentheses, or assigning to something that isn't a variable (5 = x). Read the caret in the message — it points at where Python got confused, which is usually just after the real mistake.",
  code:{py:`# SyntaxError: code Python can't parse. Common causes:
 #   missing ':'      ->  if x > 0
 #   unmatched ()     ->  print("hi"
 #   invalid target   ->  5 = x
 print("the examples above are shown as comments so this file still runs")`}},
 {id:"py-err-typeerror", cat:"Python Examples", title:"Errors · TypeError",
- desc:"An operation applied to the wrong type.",
+ level:"beginner", example_output:"TypeError: can only concatenate str (not \"int\") to str\nfix: age: 30",
+ desc:"TypeError means an operation was applied to a value of the wrong type — the classic case is 'age: ' + 30, since Python won't silently glue a string and an int together. The fix is an explicit conversion, str(30), so both sides are the same type. Catching it with try/except lets you print a friendly message instead of crashing.",
  code:{py:`try:
     result = "age: " + 30      # can't concatenate str and int
 except TypeError as e:
     print("TypeError:", e)
 print("fix:", "age: " + str(30))`}},
 {id:"py-err-nameerror", cat:"Python Examples", title:"Errors · NameError",
- desc:"Using a name that was never defined (often a typo).",
+ level:"beginner", example_output:"NameError: name 'totl' is not defined\n10",
+ desc:"NameError means you used a name Python has never seen assigned — almost always a typo (totl for total) or using a variable before the line that defines it. Python reads top to bottom, so a name must be bound before you reference it. The message quotes the offending name, which usually makes the typo jump out.",
  code:{py:`try:
     print(totl)        # meant 'total'
 except NameError as e:
@@ -1470,7 +1476,8 @@ except NameError as e:
 total = 10
 print(total)`}},
 {id:"py-err-valueerror", cat:"Python Examples", title:"Errors · ValueError",
- desc:"Right type, but an inappropriate value.",
+ level:"beginner", example_output:"ValueError: invalid literal for int() with base 10: 'twelve'\n12",
+ desc:"ValueError means the type is right but the value doesn't make sense for the operation — int('twelve') fails because, although it's a string as int() expects, 'twelve' isn't a parseable number (int('12') works). It shows up constantly when converting user input, so wrap those conversions in try/except and re-prompt on failure.",
  code:{py:`try:
     n = int("twelve")     # can't parse this as an int
 except ValueError as e:
@@ -1478,7 +1485,8 @@ except ValueError as e:
 print(int("12"))          # works`}},
 
 {id:"py-mod-import", cat:"Python Examples", title:"Modules · Importing modules",
- desc:"import, from-import, and aliasing with as.",
+ level:"beginner", example_output:"4.0\n3     ← randint(1, 6), varies each run\n4",
+ desc:"import makes another module's code available. Three forms cover most needs: import math (then use math.sqrt), from random import randint (pull one name in directly), and import statistics as stats (a shorter alias). Prefer 'import module' or explicit 'from module import name' over 'import *', which dumps everything and hides where names came from.",
  code:{py:`import math                     # whole module
 from random import randint      # one name from a module
 import statistics as stats      # with an alias
@@ -1486,7 +1494,8 @@ print(math.sqrt(16))            # 4.0
 print(randint(1, 6))            # a die roll
 print(stats.mean([2, 4, 6]))    # 4`}},
 {id:"py-mod-random", cat:"Python Examples", title:"Modules · The random module",
- desc:"Random floats, integers, choices, and in-place shuffle.",
+ level:"beginner", example_output:"0.5488135039273248   ← random float in [0.0, 1.0)\n4                    ← randint(1, 6)\nb                    ← choice(...)\n[3, 1, 5, 2, 4]      ← deck after shuffle",
+ desc:"The random module generates pseudo-random values. The staples: random() for a float in [0.0, 1.0), randint(a, b) for an integer including both ends, choice(seq) to pick one item, and shuffle(seq) to reorder a list in place (it returns None and mutates the list). Call random.seed(n) first when you need reproducible results, e.g. in tests.",
  code:{py:`import random
 print(random.random())            # float in [0.0, 1.0)
 print(random.randint(1, 6))       # int 1..6 inclusive
@@ -1496,7 +1505,8 @@ random.shuffle(deck)              # shuffles in place
 print(deck)`}},
 
 {id:"py-turtle", cat:"Python Examples", title:"Turtle · The turtle module",
- desc:"Instances, attributes, and methods; opens a graphics window.",
+ level:"beginner",
+ desc:"The turtle module is a friendly first taste of objects and graphics: you create a Screen and a Turtle (each an object), then call methods on them — forward(), right(), color() — to move a pen and draw. It's a hands-on way to meet instances, attributes, and methods before classes are introduced formally. This script draws a square; mainloop() keeps the window open.",
  code:{py:`import turtle
 wn = turtle.Screen()      # a Screen instance
 t = turtle.Turtle()       # a Turtle instance (object)
