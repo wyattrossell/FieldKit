@@ -2257,21 +2257,24 @@ deep[0][0] = 99
 print(b)                       # [[1, 2], [3, 4]]  <- safe`}},
 
 {id:"py-test-assert", cat:"Python Examples", title:"Testing · Test cases (assert)",
- desc:"assert raises AssertionError when an expectation is false.",
+ level:"intermediate", example_output:"all tests passed",
+ desc:"assert checks that a condition is True and does nothing if it is; if it's False it raises AssertionError and stops the program. It's the simplest form of a test — state what you expect (double(2) == 4) and let Python verify it. Note assertions can be stripped when Python runs with -O, so use them for tests and internal sanity checks, not for validating user input.",
  code:{py:`def double(x):
     return x * 2
 assert double(2) == 4      # passes silently
 assert double(0) == 0
 print("all tests passed")`}},
 {id:"py-test-datatype", cat:"Python Examples", title:"Testing · Checking data-type assumptions",
- desc:"Assert the result is the type you expect.",
+ level:"intermediate", example_output:"4.0",
+ desc:"A good check confirms not just the value but that it has the type you expect. isinstance(result, float) asserts the average came back as a float — catching a bug if some code path returned an int or a string instead. isinstance is the right tool for type checks (it also accepts subclasses), and pairing it with assert documents your assumptions in code.",
  code:{py:`def average(nums):
     return sum(nums) / len(nums)
 result = average([2, 4, 6])
 assert isinstance(result, float)
 print(result)`}},
 {id:"py-test-other", cat:"Python Examples", title:"Testing · Checking other assumptions",
- desc:"Assert invariants (ranges, bounds) hold.",
+ level:"intermediate", example_output:"ok",
+ desc:"Beyond specific values, assert invariants — properties that must always hold. clamp should keep its result within 0..100 no matter the input, so 'assert 0 <= clamp(37) <= 100' checks that rule directly. Testing invariants catches whole classes of bugs at once, and they double as executable documentation of what the function guarantees.",
  code:{py:`def clamp(x):
     return max(0, min(100, x))
 assert clamp(150) == 100
@@ -2279,7 +2282,8 @@ assert clamp(-5) == 0
 assert 0 <= clamp(37) <= 100       # invariant holds
 print("ok")`}},
 {id:"py-test-conditionals", cat:"Python Examples", title:"Testing · Testing conditionals",
- desc:"Exercise every branch of an if/elif/else.",
+ level:"intermediate", example_output:"branches covered",
+ desc:"When a function branches, make sure every path is exercised: for sign() that means one test each for positive, negative, and zero. Untested branches are where bugs hide, because the code 'works' until the missed case shows up. A quick checklist per function: is there a test that reaches each return?",
  code:{py:`def sign(n):
     if n > 0: return "pos"
     elif n < 0: return "neg"
@@ -2289,7 +2293,8 @@ assert sign(-5) == "neg"
 assert sign(0) == "zero"
 print("branches covered")`}},
 {id:"py-test-loops", cat:"Python Examples", title:"Testing · Testing loops",
- desc:"Test empty, none-match, and some-match inputs.",
+ level:"intermediate", example_output:"loop tests passed",
+ desc:"Loops deserve edge-case tests: the empty input (does it handle zero items?), the 'none match' case, and a 'some match' case. count_evens is checked against [], [1,3], and [2,4,5]. Empty and boundary inputs are the usual culprits for off-by-one and initialization bugs, so test them deliberately rather than assuming the happy path covers everything.",
  code:{py:`def count_evens(nums):
     c = 0
     for n in nums:
@@ -2300,7 +2305,8 @@ assert count_evens([1, 3]) == 0        # none
 assert count_evens([2, 4, 5]) == 2     # some
 print("loop tests passed")`}},
 {id:"py-test-return", cat:"Python Examples", title:"Testing · Return value tests",
- desc:"Assert the returned value for several inputs.",
+ level:"intermediate", example_output:"return values verified",
+ desc:"The most basic test asserts what a function returns for a handful of representative inputs — a normal case, an edge (adding to make 0), and a boundary. Testing several inputs, not just one, guards against a function that happens to be right for a single value but wrong in general. Keep the expected results obvious so the test itself is easy to trust.",
  code:{py:`def add(a, b):
     return a + b
 assert add(2, 3) == 5
@@ -2308,7 +2314,8 @@ assert add(-1, 1) == 0
 assert add(0, 0) == 0
 print("return values verified")`}},
 {id:"py-test-sideeffect", cat:"Python Examples", title:"Testing · Side effect tests",
- desc:"Verify a mutation actually happened.",
+ level:"intermediate", example_output:"side effect verified",
+ desc:"Some functions don't return a useful value; their job is a side effect, like mutating a list. To test those, perform the action and then assert the state changed as intended (data == [1, 2, 0]). The pattern is arrange-act-assert: set up the input, call the function, then check what it did to the world.",
  code:{py:`def append_zero(lst):
     lst.append(0)
 data = [1, 2]
@@ -2316,7 +2323,8 @@ append_zero(data)
 assert data == [1, 2, 0]
 print("side effect verified")`}},
 {id:"py-test-optional", cat:"Python Examples", title:"Testing · Testing optional parameters",
- desc:"Test both the default and an overridden value.",
+ level:"intermediate", example_output:"optional params verified",
+ desc:"A function with a default parameter really has two behaviours to test: the default path (greet('Sam') uses 'Hello') and the overridden path (passing 'Hi'). Testing only one leaves half the logic unchecked. Whenever a parameter is optional or a flag toggles behaviour, write a test for each setting.",
  code:{py:`def greet(name, greeting="Hello"):
     return f"{greeting}, {name}"
 assert greet("Sam") == "Hello, Sam"          # default
@@ -2324,14 +2332,16 @@ assert greet("Sam", "Hi") == "Hi, Sam"       # override
 print("optional params verified")`}},
 
 {id:"py-exc-intro", cat:"Python Examples", title:"Exceptions · Exceptions",
- desc:"An exception interrupts flow when something goes wrong.",
+ level:"intermediate", example_output:"that index doesn't exist",
+ desc:"An exception is Python's way of signalling that something went wrong — it interrupts the normal flow and travels up looking for a handler. Wrapping risky code in try and pairing it with an except clause for the expected error lets you respond gracefully instead of crashing. Catch specific types (IndexError here) rather than everything, so you don't accidentally hide unrelated bugs.",
  code:{py:`nums = [1, 2, 3]
 try:
     print(nums[10])
 except IndexError:
     print("that index doesn't exist")`}},
 {id:"py-exc-flow", cat:"Python Examples", title:"Exceptions · try/except flow of control",
- desc:"try runs code; except handles errors; finally always runs.",
+ level:"intermediate", example_output:"caught it\nfinally always runs",
+ desc:"try/except/finally structures error handling. The try block runs until something raises; if a matching except is found, control jumps there (the rest of the try is skipped); the optional finally block runs no matter what — success, handled error, or even an unhandled one. Use finally for cleanup that must happen (closing resources), though 'with' often handles that for you.",
  code:{py:`try:
     x = int("not a number")
     print("this line is skipped")
@@ -2340,7 +2350,8 @@ except ValueError:
 finally:
     print("finally always runs")`}},
 {id:"py-exc-raise", cat:"Python Examples", title:"Exceptions · Raising and catching errors (raise)",
- desc:"raise signals an error; the caller can catch it.",
+ level:"intermediate", example_output:"error: insufficient funds",
+ desc:"You can raise exceptions yourself to signal that a function can't proceed — raise ValueError('insufficient funds') stops execution and hands a descriptive error to the caller. That's cleaner than returning a special error code, because the caller must deal with it. Pick the most fitting built-in type and include a helpful message; 'except ... as e' captures it for inspection.",
  code:{py:`def withdraw(balance, amount):
     if amount > balance:
         raise ValueError("insufficient funds")
@@ -2350,7 +2361,8 @@ try:
 except ValueError as e:
     print("error:", e)`}},
 {id:"py-exc-standard", cat:"Python Examples", title:"Exceptions · Standard exceptions",
- desc:"Common built-in exception types by name.",
+ level:"intermediate", example_output:"ZeroDivisionError -> division by zero\nValueError -> invalid literal for int() with base 10: 'x'\nIndexError -> list index out of range\nNameError -> name 'undefined_name' is not defined",
+ desc:"Python has a family of built-in exception types, each naming a category of problem: ZeroDivisionError, ValueError (right type, bad value), IndexError (out-of-range access), NameError (undefined name), plus KeyError, TypeError, and more. Knowing them helps you read tracebacks and catch precisely the errors you expect. type(e).__name__ pulls the class name from a caught exception.",
  code:{py:`for call in ["1/0", "int('x')", "[][0]", "undefined_name"]:
     try:
         eval(call)
