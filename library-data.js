@@ -2698,59 +2698,59 @@ WHERE c1 BETWEEN low AND high;`}},
 WHERE c1 IS NULL;   -- or IS NOT NULL`}},
 
 /* ---------- managing tables ---------- */
-{id:"sql-create-table", cat:"SQL", title:"CREATE TABLE", desc:"Create a table with typed columns and inline column constraints.",
+{id:"sql-create-table", cat:"SQL", title:"CREATE TABLE", level:"beginner", example_output:"-- creates the table; no rows returned\nTable 'employees' created — ready for INSERTs.", desc:"CREATE TABLE defines a new table: a name, then a comma-separated list of columns, each with a name and a data type, plus optional column constraints like PRIMARY KEY, NOT NULL, or DEFAULT. This is the schema — the shape every row must follow. Data type names vary by engine (INT/INTEGER, VARCHAR(n)/TEXT), and adding IF NOT EXISTS avoids an error when the table already exists.",
  code:{sql:`CREATE TABLE t (
   id    INT PRIMARY KEY,
   name  VARCHAR NOT NULL,
   price INT DEFAULT 0
 );`}},
-{id:"sql-drop-table", cat:"SQL", title:"DROP TABLE", desc:"Delete a table's data and structure from the database.",
+{id:"sql-drop-table", cat:"SQL", title:"DROP TABLE", level:"beginner", example_output:"Table 'employees' dropped — definition and all rows removed.", desc:"DROP TABLE permanently removes a table — its definition and all of its data — and can't be undone without a backup. It differs from DELETE (removes rows, keeps the table) and TRUNCATE (empties the table, keeps its structure). Add IF EXISTS to avoid an error when the table is already gone. Dropping a table that other tables reference by foreign key may be blocked until those references are handled.",
  danger:"Permanently removes the table and everything in it.",
  code:{sql:`DROP TABLE t;`}},
-{id:"sql-truncate", cat:"SQL", title:"TRUNCATE TABLE", desc:"Remove all rows quickly, keeping the table structure.",
+{id:"sql-truncate", cat:"SQL", title:"TRUNCATE TABLE", level:"intermediate", example_output:"Table 'logs' truncated — all rows removed, structure kept.", desc:"TRUNCATE TABLE removes every row at once while keeping the table's structure, so you can immediately insert again. It's much faster than DELETE for clearing a whole table because it typically deallocates data pages instead of logging each row — but that also means it usually can't be rolled back, skips row-level triggers, and often resets AUTO_INCREMENT/identity counters. Use DELETE when you need WHERE filtering, triggers, or transactional undo.",
  danger:"Deletes every row; usually cannot be rolled back and resets identity counters.",
  code:{sql:`TRUNCATE TABLE t;`}},
-{id:"sql-add-column", cat:"SQL", title:"ALTER TABLE ADD column", desc:"Add a new column to an existing table.",
+{id:"sql-add-column", cat:"SQL", title:"ALTER TABLE ADD column", level:"beginner", example_output:"-- existing rows get NULL / the DEFAULT\nColumn 'email' added to 'employees'.", desc:"ALTER TABLE ... ADD appends a new column to an existing table without recreating it. Existing rows receive NULL (or the column's DEFAULT) for the new field. You specify the column name and its data type, plus any inline constraints. On large tables this can be a slow, locking operation in some engines, so check how your database handles it before running it in production.",
  code:{sql:`ALTER TABLE t ADD column_name datatype;`}},
-{id:"sql-drop-column", cat:"SQL", title:"ALTER TABLE DROP COLUMN", desc:"Remove a column from a table.",
+{id:"sql-drop-column", cat:"SQL", title:"ALTER TABLE DROP COLUMN", level:"beginner", example_output:"Column 'email' dropped from 'employees' — its data is gone.", desc:"ALTER TABLE ... DROP COLUMN removes a column and all the data stored in it — irreversible without a backup. Constraints, indexes, or views that depend on the column may block the drop or need dropping first. Dialect note: SQLite historically had limited support and required rebuilding the table, though recent versions added DROP COLUMN.",
  danger:"Permanently deletes the column and all data it holds.",
  code:{sql:`ALTER TABLE t DROP COLUMN c;`}},
-{id:"sql-add-constraint", cat:"SQL", title:"ALTER TABLE ADD constraint", desc:"Attach a constraint (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK) to an existing table.",
+{id:"sql-add-constraint", cat:"SQL", title:"ALTER TABLE ADD constraint", level:"intermediate", example_output:"Constraint 'fk_dept' added to 'employees'.", desc:"ALTER TABLE ... ADD CONSTRAINT attaches a rule to an existing table — a PRIMARY KEY, FOREIGN KEY, UNIQUE, or CHECK — and names it so you can drop it later by that name. Naming constraints explicitly (rather than letting the engine auto-name them) makes them far easier to manage. If the current data already violates the new rule, the database rejects the ALTER, so clean the data first.",
  code:{sql:`ALTER TABLE t ADD CONSTRAINT constraint_name constraint_definition;`}},
-{id:"sql-drop-constraint", cat:"SQL", title:"ALTER TABLE DROP constraint", desc:"Remove a named constraint from a table.",
+{id:"sql-drop-constraint", cat:"SQL", title:"ALTER TABLE DROP constraint", level:"intermediate", example_output:"Constraint 'fk_dept' dropped from 'employees'.", desc:"ALTER TABLE ... DROP CONSTRAINT removes a constraint by its name, lifting the rule it enforced (for example, allowing values a CHECK previously forbade). You need the constraint's name, which is why naming them at creation helps. Dialect note: MySQL doesn't use this generic form for every type — you drop with DROP PRIMARY KEY, DROP FOREIGN KEY fk_name, or DROP INDEX for a unique constraint.",
  code:{sql:`ALTER TABLE t DROP CONSTRAINT constraint_name;`}},
-{id:"sql-rename-table", cat:"SQL", title:"Rename a table", desc:"Rename table t1 to t2. (MySQL: RENAME TABLE t1 TO t2.)",
+{id:"sql-rename-table", cat:"SQL", title:"Rename a table", level:"beginner", example_output:"Table 'emp' renamed to 'employees'.", desc:"ALTER TABLE ... RENAME TO gives a table a new name while keeping its data, columns, and (usually) its indexes. Beware that views, stored procedures, or application code referencing the old name will break until updated — the rename doesn't chase down those references. Syntax varies: MySQL also allows RENAME TABLE t1 TO t2, and SQL Server uses the sp_rename procedure.",
  code:{sql:`ALTER TABLE t1 RENAME TO t2;`}},
-{id:"sql-rename-column", cat:"SQL", title:"Rename a column", desc:"Rename column c1 to c2. Some databases spell it ALTER TABLE t RENAME COLUMN c1 TO c2.",
+{id:"sql-rename-column", cat:"SQL", title:"Rename a column", level:"beginner", example_output:"Column 'fname' renamed to 'first_name' in 'employees'.", desc:"ALTER TABLE ... RENAME changes a column's name without touching its data or type. As with renaming a table, anything referencing the old column name — views, triggers, and app queries — must be updated. This exact syntax is relatively modern; some engines require the COLUMN keyword (RENAME COLUMN c1 TO c2), and older MySQL used CHANGE COLUMN, which also restates the type.",
  code:{sql:`ALTER TABLE t1 RENAME c1 TO c2;`}},
 
 /* ---------- constraints ---------- */
-{id:"sql-primary-key", cat:"SQL", title:"PRIMARY KEY (composite)", desc:"Uniquely identify each row; a composite key spans several columns and implies NOT NULL.",
+{id:"sql-primary-key", cat:"SQL", title:"PRIMARY KEY (composite)", level:"intermediate", example_output:"-- rows must be unique on (c1, c2) and non-NULL\nTable created with a composite primary key.", desc:"A PRIMARY KEY uniquely identifies each row: the column(s) must be unique and non-NULL, and a table has at most one. Listing several columns — PRIMARY KEY (c1, c2) — makes a composite key that's unique on the combination, useful for link/junction tables. Most engines automatically create an index on the primary key, which is why lookups by it are fast.",
  code:{sql:`CREATE TABLE t (
   c1 INT,
   c2 INT,
   c3 VARCHAR,
   PRIMARY KEY (c1, c2)
 );`}},
-{id:"sql-foreign-key", cat:"SQL", title:"FOREIGN KEY", desc:"Enforce referential integrity by pointing a column at another table's key.",
+{id:"sql-foreign-key", cat:"SQL", title:"FOREIGN KEY", level:"intermediate", example_output:"-- c2 must match an existing t2.c2\nTable created; referential integrity enforced.", desc:"A FOREIGN KEY links a column to the primary key of another table, enforcing referential integrity: you can't insert a child row whose reference doesn't exist in the parent, and (depending on ON DELETE / ON UPDATE rules) deleting a referenced parent row is either blocked or cascades. Here c2 must match a value in t2. This is how relational tables stay consistent; the referenced column must be a PRIMARY or UNIQUE key.",
  code:{sql:`CREATE TABLE t1 (
   c1 INT PRIMARY KEY,
   c2 INT,
   FOREIGN KEY (c2) REFERENCES t2 (c2)
 );`}},
-{id:"sql-unique", cat:"SQL", title:"UNIQUE", desc:"Require the value (or combination of columns) to be unique across rows.",
+{id:"sql-unique", cat:"SQL", title:"UNIQUE", level:"beginner", example_output:"-- the (c2, c3) combination must not repeat\nTable created with a unique constraint.", desc:"A UNIQUE constraint forbids duplicate values in a column or combination of columns, while still allowing the row to exist — unlike a primary key, a table can have several UNIQUE constraints and (in most engines) a UNIQUE column may hold one NULL. Use it for things that must not repeat but aren't the row's identity, like an email address. It's enforced by an automatically created unique index.",
  code:{sql:`CREATE TABLE t (
   c1 INT,
   c2 INT,
   UNIQUE (c2, c3)
 );`}},
-{id:"sql-check", cat:"SQL", title:"CHECK", desc:"Reject any row that fails a boolean condition.",
+{id:"sql-check", cat:"SQL", title:"CHECK", level:"intermediate", example_output:"-- inserts violating (c1 > 0 AND c1 >= c2) are rejected\nTable created with a check constraint.", desc:"A CHECK constraint restricts the values a column may hold to those satisfying a boolean expression — CHECK (c1 > 0 AND c1 >= c2) rejects any row that fails it. It pushes a business rule into the database so invalid data can't be inserted from any client. Note: MySQL parsed but silently ignored CHECK until version 8.0.16, so verify your engine actually enforces it.",
  code:{sql:`CREATE TABLE t (
   c1 INT,
   c2 INT,
   CHECK (c1 > 0 AND c1 >= c2)
 );`}},
-{id:"sql-not-null", cat:"SQL", title:"NOT NULL", desc:"Require a column to always hold a value.",
+{id:"sql-not-null", cat:"SQL", title:"NOT NULL", level:"beginner", example_output:"-- c2 can never be NULL\nTable created; c2 is required on every row.", desc:"NOT NULL requires a column to always have a value — any INSERT or UPDATE that would leave it NULL is rejected. It's the simplest data-quality guarantee, ensuring required fields like a name or email are never missing. Pair it with a DEFAULT when you want a fallback value supplied automatically instead of forcing every INSERT to specify the column.",
  code:{sql:`CREATE TABLE t (
   c1 INT PRIMARY KEY,
   c2 VARCHAR NOT NULL
