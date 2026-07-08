@@ -119,6 +119,7 @@ for (const e of LIB) {
       if (!s.title || !String(s.title).trim()) err(id, `steps[${i}] missing title`);
       if (!s.cmd || !String(s.cmd).trim()) err(id, `steps[${i}] missing cmd`);
       if (s.note !== undefined && typeof s.note !== "string") err(id, `steps[${i}].note must be a string`);
+      if (s.optional !== undefined && typeof s.optional !== "boolean") err(id, `steps[${i}].optional must be a boolean`);
     });
   }
 

@@ -187,6 +187,8 @@
   .wf-step::before{content:counter(wf); position:absolute; left:0; top:0; width:26px; height:26px; border-radius:50%; background:var(--panel2); border:1px solid var(--edge2); color:var(--amber); font-family:var(--mono); font-size:12px; display:flex; align-items:center; justify-content:center; font-weight:600}
   .wf-step:not(:last-child)::after{content:""; position:absolute; left:13px; top:30px; bottom:-14px; width:1px; background:var(--edge)}
   .wf-title{font-size:13.5px; color:var(--ink); font-weight:600; margin:3px 0 7px}
+  .wf-opt{font-family:var(--mono); font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:var(--faint); border:1px solid var(--edge2); border-radius:8px; padding:1px 6px; margin-left:8px; vertical-align:middle; font-weight:400}
+  .wf-step.opt::before{color:var(--faint); border-style:dashed}
   .wf-cmd{display:flex; align-items:flex-start; gap:8px; background:var(--panel2); border:1px solid var(--edge); border-radius:6px; padding:8px 10px}
   .wf-code{flex:1; font-family:var(--mono); font-size:12px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; color:#dfe6ee}
   .wf-copy{flex:none}
@@ -1242,8 +1244,8 @@ function renderToolDetail(item){
      </div>`).join("")}</div>` : "";
   const steps=Array.isArray(item.steps)&&item.steps.length ? `<div class="wf">
       <div class="insthdr">Step-by-step workflow</div>
-      <ol class="wf-list">${item.steps.map(s=>`<li class="wf-step">
-        <div class="wf-title">${esc(s.title)}</div>
+      <ol class="wf-list">${item.steps.map(s=>`<li class="wf-step${s.optional?' opt':''}">
+        <div class="wf-title">${esc(s.title)}${s.optional?`<span class="wf-opt">optional</span>`:""}</div>
         <div class="wf-cmd"><code class="wf-code">${highlightCode(String(s.cmd), "linux")}</code><button class="act wf-copy" data-cmd="${esc(s.cmd)}">Copy</button></div>
         ${s.note?`<div class="wf-note">${esc(s.note)}</div>`:""}
       </li>`).join("")}</ol>
