@@ -111,6 +111,16 @@ for (const e of LIB) {
   if (e.updated !== undefined && !/^\d{4}-\d{2}$/.test(String(e.updated))) err(id, `updated must be "YYYY-MM"`);
   if (e.level !== undefined && !LEVELS.includes(e.level)) err(id, `level must be one of ${LEVELS.join("/")}`);
   if (e.example_output !== undefined && (typeof e.example_output !== "string" || !e.example_output.trim())) err(id, "example_output must be a non-empty string");
+  // optional step-by-step walkthrough (mainly for tool entries)
+  if (e.steps !== undefined) {
+    if (!Array.isArray(e.steps) || !e.steps.length) err(id, "steps must be a non-empty array");
+    else e.steps.forEach((s, i) => {
+      if (typeof s !== "object" || Array.isArray(s)) { err(id, `steps[${i}] must be an object`); return; }
+      if (!s.title || !String(s.title).trim()) err(id, `steps[${i}] missing title`);
+      if (!s.cmd || !String(s.cmd).trim()) err(id, `steps[${i}] missing cmd`);
+      if (s.note !== undefined && typeof s.note !== "string") err(id, `steps[${i}].note must be a string`);
+    });
+  }
 
   // purple-team rule: offensive entries must be paired with detection guidance
   if (e.team === "red" || e.team === "purple") {
