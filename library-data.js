@@ -213,8 +213,14 @@ sudo grep -r '^psk=' /etc/NetworkManager/system-connections/ 2>/dev/null`
 /* ---------- USERS & ACCESS ---------- */
 {id:"usr-list", level:"beginner", cat:"Users & Access", title:"List local user accounts",
  desc:"Enumerate local accounts and whether they're enabled.",
+ example_output:`Name          Enabled Last Logon       Description
+----          ------- ----------       -----------
+Administrator   False 2025-05-29 03:58 Built-in admin account
+Guest           False never            Built-in guest account
+Wyatt            True 2026-07-08 09:14`,
  code:{
-  ps:`Get-LocalUser | Select-Object Name, Enabled, LastLogon, Description`,
+  ps:`Get-LocalUser | Sort-Object Name |
+  Format-Table -AutoSize Name, Enabled, @{n='Last Logon';e={if($_.LastLogon){$_.LastLogon.ToString('yyyy-MM-dd HH:mm')}else{'never'}}}, Description`,
   cmd:`net user`,
   mac:`# real (non-service) accounts hide the leading-underscore system users:
 dscl . -list /Users | grep -v '^_'`,
@@ -222,9 +228,14 @@ dscl . -list /Users | grep -v '^_'`,
  }},
 {id:"usr-admins", level:"beginner", cat:"Users & Access", title:"List administrators / sudoers",
  desc:"Who has elevated rights on this box.",
+ example_output:`Name                   ObjectClass PrincipalSource
+----                   ----------- ---------------
+DESKTOP\\Administrator  User        Local
+DESKTOP\\Wyatt          User        Local
+CORP\\Domain Admins     Group       ActiveDirectory`,
  code:{
   ps:`Get-LocalGroupMember -Group 'Administrators' |
-  Select-Object Name, ObjectClass, PrincipalSource`,
+  Format-Table -AutoSize Name, ObjectClass, PrincipalSource`,
   cmd:`net localgroup administrators`,
   mac:`dscl . -read /Groups/admin GroupMembership`,
   linux:`echo "sudo:";  getent group sudo  | cut -d: -f4
@@ -254,9 +265,11 @@ sudo passwd techuser`
  }},
 {id:"usr-loggedon", level:"beginner", cat:"Users & Access", title:"Who is logged on",
  desc:"Current interactive and remote sessions.",
+ example_output:` USERNAME  SESSIONNAME  ID  STATE   IDLE TIME  LOGON TIME
+ wyatt     console       1  Active  none       7/8/2026 9:14 AM
+ admin     rdp-tcp#2     3  Active  12:04      7/8/2026 8:02 AM`,
  code:{
-  ps:`query user 2>$null
-Get-CimInstance Win32_LoggedOnUser | Select-Object -Expand Antecedent -Unique`,
+  ps:`query user`,
   cmd:`query user`,
   mac:`who
 echo "-- active --"; w`,
@@ -942,9 +955,16 @@ groups techuser`
  }},
 {id:"usr-lastlogon", level:"beginner",requires:{"elevation":true}, cat:"Users & Access", title:"Last logon & password age",
  desc:"When accounts last signed in and when passwords were last changed.",
+ example_output:`Name          Enabled Last Logon Pwd Set    Pwd Expires
+----          ------- ---------- -------    -----------
+Administrator   False never      2024-01-15 never
+Wyatt            True 2026-07-08 2026-05-01 2026-08-30`,
  code:{
-  ps:`Get-LocalUser |
-  Select-Object Name, Enabled, LastLogon, PasswordLastSet, PasswordExpires`,
+  ps:`Get-LocalUser | Sort-Object Name |
+  Format-Table -AutoSize Name, Enabled,
+    @{n='Last Logon';e={if($_.LastLogon){$_.LastLogon.ToString('yyyy-MM-dd')}else{'never'}}},
+    @{n='Pwd Set';e={if($_.PasswordLastSet){$_.PasswordLastSet.ToString('yyyy-MM-dd')}else{'-'}}},
+    @{n='Pwd Expires';e={if($_.PasswordExpires){$_.PasswordExpires.ToString('yyyy-MM-dd')}else{'never'}}}`,
   cmd:`net user techuser | findstr /C:"Last logon" /C:"Password last set" /C:"Password expires"`,
   mac:`last | head -20
 # password last set:
