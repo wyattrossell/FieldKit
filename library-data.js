@@ -622,13 +622,19 @@ print(*os.environ.get("PATH","").split(os.pathsep), sep="\\n")`
  }},
 {id:"sys-memory", level:"beginner", cat:"System Info", title:"Memory usage (used / free)",
  desc:"Physical RAM total, used, and available right now.",
+ example_output:`Total(GB) Used(GB) Free(GB) Used%
+--------- -------- -------- -----
+     31.3     15.3     16.0    49`,
  code:{
-  ps:`$os=Get-CimInstance Win32_OperatingSystem
+  ps:`$os = Get-CimInstance Win32_OperatingSystem
+$total = [math]::Round($os.TotalVisibleMemorySize/1MB,1)
+$free  = [math]::Round($os.FreePhysicalMemory/1MB,1)
 [pscustomobject]@{
-  Total_GB=[math]::Round($os.TotalVisibleMemorySize/1MB,1)
-  Free_GB =[math]::Round($os.FreePhysicalMemory/1MB,1)
-  Used_GB =[math]::Round(($os.TotalVisibleMemorySize-$os.FreePhysicalMemory)/1MB,1)
-}`,
+  'Total(GB)' = $total
+  'Used(GB)'  = [math]::Round($total-$free,1)
+  'Free(GB)'  = $free
+  'Used%'     = [math]::Round(($total-$free)/$total*100)
+} | Format-Table -AutoSize`,
   cmd:`systeminfo | findstr /C:"Total Physical Memory" /C:"Available Physical Memory"`,
   mac:`top -l 1 | grep -E "PhysMem"
 vm_stat`,
@@ -662,10 +668,14 @@ sudo systemsetup -getusingnetworktime 2>/dev/null`,
  }},
 {id:"sys-drivers", level:"beginner", cat:"System Info", title:"Drivers & hardware devices",
  desc:"Enumerate device drivers / kernel modules and attached hardware.",
+ example_output:`Device                    Version         Vendor           Date
+------                    -------         ------           ----
+ACPI Fixed Feature Button 10.0.26100.1150 Standard devices 2006-06-20
+AMD Radeon(TM) 610M       32.0.21030.130  AMD              2025-03-11`,
  code:{
-  ps:`Get-CimInstance Win32_PnPSignedDriver |
-  Select-Object DeviceName, DriverVersion, Manufacturer, DriverDate |
-  Sort-Object DeviceName`,
+  ps:`Get-CimInstance Win32_PnPSignedDriver | Where-Object DeviceName | Sort-Object DeviceName |
+  Format-Table -AutoSize @{n='Device';e={$_.DeviceName}}, @{n='Version';e={$_.DriverVersion}},
+    @{n='Vendor';e={$_.Manufacturer}}, @{n='Date';e={if($_.DriverDate){([datetime]$_.DriverDate).ToString('yyyy-MM-dd')}}}`,
   cmd:`driverquery /v /fo table`,
   mac:`system_profiler SPPCIDataType SPUSBDataType
 # third-party kernel extensions:
@@ -676,10 +686,14 @@ echo "-- loaded modules --"; lsmod`
  }},
 {id:"sys-display", level:"beginner", cat:"System Info", title:"GPU & display info",
  desc:"Graphics adapter, driver, and connected monitors / resolution.",
+ example_output:`GPU                       Driver           Resolution Hz
+---                       ------           ---------- --
+AMD Radeon(TM) 610M       32.0.21030.13004 2560x1600  240
+NVIDIA GeForce RTX 5060   32.0.15.9201     3840x2160  144`,
  code:{
   ps:`Get-CimInstance Win32_VideoController |
-  Select-Object Name, DriverVersion,
-    CurrentHorizontalResolution, CurrentVerticalResolution, CurrentRefreshRate`,
+  Format-Table -AutoSize @{n='GPU';e={$_.Name}}, @{n='Driver';e={$_.DriverVersion}},
+    @{n='Resolution';e={"$($_.CurrentHorizontalResolution)x$($_.CurrentVerticalResolution)"}}, @{n='Hz';e={$_.CurrentRefreshRate}}`,
   cmd:`wmic path win32_VideoController get name,driverversion,videomodedescription
 :: wmic is deprecated; prefer PowerShell Get-CimInstance Win32_VideoController`,
   mac:`system_profiler SPDisplaysDataType`,
