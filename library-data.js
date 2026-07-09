@@ -384,10 +384,23 @@ ls -la ~/.config/autostart/ 2>/dev/null`
 /* ---------- FORENSICS ---------- */
 {id:"for-recent", level:"intermediate", cat:"Forensics", title:"Recently modified files (last 24h)",
  desc:"Surface files touched in the last day — activity triage.",
+ example_output:`Modified     Size     File
+--------     ----     ----
+6 min ago    14 KB    .\\report.md
+2.3 hr ago   1.2 MB   .\\data\\export.csv
+9.1 hr ago   823 B    .\\notes.txt`,
  code:{
-  ps:`Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue |
+  ps:`Get-ChildItem -Recurse -File -ErrorAction SilentlyContinue |
   Where-Object LastWriteTime -gt (Get-Date).AddDays(-1) |
-  Select-Object LastWriteTime, FullName | Sort-Object LastWriteTime -Descending`,
+  Sort-Object LastWriteTime -Descending |
+  ForEach-Object {
+    $mins = [int]((Get-Date) - $_.LastWriteTime).TotalMinutes
+    if ($mins -lt 60) { $when = "$mins min ago" } else { $when = "{0:N1} hr ago" -f ($mins / 60) }
+    if     ($_.Length -ge 1MB) { $size = "{0:N1} MB" -f ($_.Length / 1MB) }
+    elseif ($_.Length -ge 1KB) { $size = "{0:N0} KB" -f ($_.Length / 1KB) }
+    else                       { $size = "$($_.Length) B" }
+    [pscustomobject]@{ Modified = $when; Size = $size; File = Resolve-Path -Relative $_.FullName }
+  } | Format-Table -AutoSize`,
   mac:`find . -type f -mtime -1 -exec stat -f '%Sm  %N' {} + 2>/dev/null | sort`,
   linux:`find . -type f -mtime -1 -printf '%TY-%Tm-%Td %TH:%TM  %p\\n' 2>/dev/null | sort`,
   py:`import os, time
