@@ -1407,8 +1407,14 @@ net start spooler`,
  }},
 {id:"mnt-printers", level:"beginner", cat:"Maintenance", title:"List printers & default",
  desc:"Installed printers and which one is the default.",
+ example_output:`Name           DriverName             PortName     Shared PrinterStatus
+----           ----------             --------     ------ -------------
+HP LaserJet    HP Universal Printing  192.168.1.50 True   Normal
+Microsoft PDF  Microsoft Print To PDF PORTPROMPT:  False  Normal
+
+Default: HP LaserJet`,
  code:{
-  ps:`Get-Printer | Select-Object Name, DriverName, PortName, Shared, PrinterStatus
+  ps:`Get-Printer | Format-Table -AutoSize Name, DriverName, PortName, Shared, PrinterStatus
 "Default: " + (Get-CimInstance Win32_Printer | Where-Object Default).Name`,
   cmd:`wmic printer get name,default,portname
 :: wmic deprecated; prefer PowerShell Get-Printer`,
@@ -1417,9 +1423,14 @@ net start spooler`,
  }},
 {id:"mnt-event-errors", level:"beginner", cat:"Maintenance", title:"Recent system errors & warnings",
  desc:"Critical/error log entries from the last day — post-incident triage.",
+ example_output:`Time        Level   Id Source
+----        -----   -- ------
+07-08 16:12 Error    36 Volsnap
+07-08 11:03 Error  1000 Application Error
+07-08 09:41 Warning  219 Kernel-PnP`,
  code:{
   ps:`Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2; StartTime=(Get-Date).AddDays(-1)} -MaxEvents 25 |
-  Select-Object TimeCreated, Id, ProviderName, LevelDisplayName`,
+  Format-Table -AutoSize @{n='Time';e={$_.TimeCreated.ToString('MM-dd HH:mm')}}, @{n='Level';e={$_.LevelDisplayName}}, Id, @{n='Source';e={$_.ProviderName}}`,
   cmd:`wevtutil qe System /q:"*[System[(Level=1 or Level=2)]]" /c:25 /rd:true /f:text`,
   mac:`log show --last 1d --predicate 'messageType == 16 || messageType == 17' 2>/dev/null | tail -30`,
   linux:`journalctl -p err -b --no-pager | tail -30`
@@ -4596,7 +4607,7 @@ Get-CimInstance Win32_MappedLogicalDisk | Select-Object Name, ProviderName`,
  {"id":"tool-burpsuite","updated":"2026-07","cat":"Tools","team":"purple","title":"Burp Suite Community","desc":"PortSwigger web proxy for intercepting/manipulating HTTP(S); free Community edition (Intruder is rate-limited).","url":"https://portswigger.net/burp/communitydownload","license":"Proprietary (PortSwigger EULA, free)","platforms":["windows","macos","linux"],"tags":["web","tools"],"attack":["T1190"],"danger":"Intercepting proxy that manipulates HTTP(S) to find and exploit web flaws; use only on authorized targets.","detect":"Proxy artifacts (modified headers, the PortSwigger CA), anomalous request tampering, and injection payloads in web logs.","mitigate":"Validate input server-side, deploy a WAF, use TLS with certificate pinning where feasible, and monitor for request tampering.","install":{"cmd":"winget install PortSwigger.BurpSuite.Community","mac":"brew install --cask burp-suite"}},
 
 /* ================= SCHEDULED TASKS & AUTOMATION ================= */
- {"id":"task-list","level":"beginner","cat":"Scheduled Tasks & Automation","title":"List scheduled jobs","desc":"Enumerate scheduled tasks / cron jobs / timers.","tags":["scheduling"],"code":{"ps":"Get-ScheduledTask | Select-Object TaskPath, TaskName, State","cmd":"schtasks /query /fo table","mac":"launchctl list; crontab -l 2>/dev/null","linux":"crontab -l 2>/dev/null; systemctl list-timers --all --no-pager"}},
+ {"id":"task-list","level":"beginner","cat":"Scheduled Tasks & Automation","title":"List scheduled jobs","desc":"Enumerate scheduled tasks / cron jobs / timers.","tags":["scheduling"],"example_output":"Path                 Task              State\n----                 ----              -----\n\\                    GoogleUpdateTask  Ready\n\\Microsoft\\Windows  ScheduledDefrag   Ready\n\\Vendor              UpdateChecker     Running","code":{"ps":"Get-ScheduledTask | Sort-Object TaskPath, TaskName |\n  Format-Table -AutoSize @{n='Path';e={$_.TaskPath}}, @{n='Task';e={$_.TaskName}}, State","cmd":"schtasks /query /fo table","mac":"launchctl list; crontab -l 2>/dev/null","linux":"crontab -l 2>/dev/null; systemctl list-timers --all --no-pager"}},
  {"id":"task-create-cron","level":"beginner","cat":"Scheduled Tasks & Automation","title":"Create a cron job","desc":"Append a recurring cron entry (mac/linux).","danger":"Adds a recurring scheduled job.","tags":["scheduling","automation"],"code":{"linux":"(crontab -l 2>/dev/null; echo \"30 2 * * * {{CMD:/usr/local/bin/backup.sh}}\") | crontab -   # daily 02:30","mac":"(crontab -l 2>/dev/null; echo \"30 2 * * * {{CMD:/usr/local/bin/backup.sh}}\") | crontab -"}},
  {"id":"task-create-win","level":"beginner","cat":"Scheduled Tasks & Automation","title":"Create a scheduled task (Windows)","desc":"Register a daily task.","danger":"Creates a scheduled task; may need admin.","tags":["scheduling","automation","windows"],"code":{"ps":"Register-ScheduledTask -TaskName \"{{NAME:MyTask}}\" -Trigger (New-ScheduledTaskTrigger -Daily -At 2am) -Action (New-ScheduledTaskAction -Execute \"{{CMD:C:/scripts/job.bat}}\")","cmd":"schtasks /create /tn \"{{NAME:MyTask}}\" /tr \"{{CMD:C:\\\\scripts\\\\job.bat}}\" /sc daily /st 02:00"}},
  {"id":"task-systemd-timer","level":"beginner","requires":{"elevation":true},"cat":"Scheduled Tasks & Automation","title":"Enable a systemd timer","desc":"Reload and enable a systemd .timer unit you've created.","danger":"Enables a recurring unit; needs root.","tags":["scheduling","automation","linux"],"code":{"linux":"sudo systemctl daemon-reload\nsudo systemctl enable --now {{NAME:job}}.timer\nsystemctl list-timers {{NAME:job}}.timer"}},
