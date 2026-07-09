@@ -492,6 +492,7 @@ for root,_,names in os.walk("."):
  }},
 {id:"for-usb", level:"intermediate", cat:"Forensics", title:"USB storage device history (Windows)",
  desc:"Devices that have been connected, from the registry.",
+ related:["for-ez-registry","for-ez-lnk-jumplists"],
  code:{
   ps:`Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR' |
   ForEach-Object { $_.PSChildName }`,
@@ -499,6 +500,7 @@ for root,_,names in os.walk("."):
  }},
 {id:"for-prefetch", level:"intermediate", cat:"Forensics", title:"Prefetch listing (execution evidence)",
  desc:"List .pf files with timestamps — evidence of program execution.",
+ related:["for-ez-prefetch"],
  code:{
   ps:`Get-ChildItem 'C:\\Windows\\Prefetch\\*.pf' -ErrorAction SilentlyContinue |
   Select-Object Name, LastWriteTime, Length | Sort-Object LastWriteTime -Descending`,
@@ -1218,6 +1220,7 @@ resolvectl statistics 2>/dev/null || echo "no dumpable cache"`
 {id:"for-evtx-export", level:"intermediate",requires:{"elevation":true}, cat:"Forensics", title:"Export a log for offline analysis",
  desc:"Save a copy of a system log to a file. Edit output paths.",
  danger:"Reading full logs needs admin/root; writes a (potentially large) export file.",
+ related:["for-ez-evtx"],
  code:{
   ps:`wevtutil epl System "$env:USERPROFILE\\Desktop\\System.evtx"
 # or CSV: Get-WinEvent -LogName System -MaxEvents 500 | Export-Csv System.csv -NoTypeInformation`,
@@ -4895,4 +4898,466 @@ Get-CimInstance Win32_MappedLogicalDisk | Select-Object Name, ProviderName`,
  {"id":"wcmd-net-localgroup","level":"beginner","requires":{"elevation":true},"cat":"Windows Essentials","title":"net localgroup - local groups","desc":"List groups or manage group membership.","tags":["windows","reference","teaching","account"],"code":{"cmd":"net localgroup\nnet localgroup Administrators\nnet localgroup Administrators {{USER:alice}} /add   # grant admin"},"danger":"Adding a user to Administrators grants full local control."},
  {"id":"wcmd-net-startstop","level":"beginner","cat":"Windows Essentials","title":"net start / stop - services","desc":"Start or stop a Windows service by name.","tags":["windows","reference","teaching"],"code":{"cmd":"net start                     # list running services\nnet start {{SVC:Spooler}}\nnet stop {{SVC:Spooler}}"}},
  {"id":"wcmd-net-use","level":"beginner","cat":"Windows Essentials","title":"net use - map network drives","desc":"Connect, list, or disconnect network shares.","tags":["windows","reference","teaching","network"],"code":{"cmd":"net use\nnet use {{DRIVE:Z:}} \\\\{{HOST:server}}\\{{SHARE:share}}\nnet use {{DRIVE:Z:}} /delete"}}
+,
+/* ---------- TOOLS — ERIC ZIMMERMAN'S EZ TOOLS (DFIR SUITE) ---------- */
+{id:"tool-ez-suite", updated:"2026-07", cat:"Tools", title:"Get-ZimmermanTools (EZ Tools downloader)", team:"blue",
+ desc:"PowerShell script that discovers and downloads Eric Zimmerman's entire forensic tool suite in one run, then keeps it current — reruns compare signatures and fetch only what changed. The one download that gets you all the others.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"],
+ tags:["forensics","tools","windows","automation"],
+ requires:{os:"Windows", tool:"PowerShell 5+"},
+ related:["for-ez-workflow","tool-ez-timeline-explorer","tool-ez-pecmd","tool-ez-evtxecmd","tool-ez-mftecmd","tool-ez-registry-explorer"],
+ steps:[
+  {"title":"Download and unpack the script","cmd":"curl -L -o Get-ZimmermanTools.zip https://download.ericzimmermanstools.com/Get-ZimmermanTools.zip && tar -xf Get-ZimmermanTools.zip","note":"tar (built into Windows 10+) avoids the gotcha the site warns about: extracting with Explorer marks the DLLs as blocked and the tools won't run."},
+  {"title":"Download the whole suite","cmd":"powershell -ExecutionPolicy Bypass -File .\\Get-ZimmermanTools.ps1 -Dest {{DEST:C:\\Tools\\EZ}}","note":"-Dest keeps the tools out of the script's folder. .NET 9 builds land in a net9 subfolder — that's the path the Forensics workflow entries call {{EZ}}."},
+  {"title":"Pick a .NET flavor","cmd":"powershell -ExecutionPolicy Bypass -File .\\Get-ZimmermanTools.ps1 -Dest {{DEST:C:\\Tools\\EZ}} -NetVersion 0","optional":true,"note":"Default is 9 (.NET 9, recommended — all GUI tools are net9-only now). 4 gets the .NET Framework 4.7.2 builds for older boxes; 0 gets everything."},
+  {"title":"Work through a proxy","cmd":"powershell -ExecutionPolicy Bypass -File .\\Get-ZimmermanTools.ps1 -Dest {{DEST:C:\\Tools\\EZ}} -Proxy http://{{PROXY:proxy.corp:8080}} -ProxyUseDefaultCredentials","optional":true,"note":"-ProxyUseDefaultCredentials authenticates as the logged-on user; use -ProxyCredential for an explicit account."},
+  {"title":"Keep the suite current","cmd":"powershell -ExecutionPolicy Bypass -File .\\Get-ZimmermanTools.ps1 -Dest {{DEST:C:\\Tools\\EZ}}","note":"!!!RemoteFileDetails.csv in Dest records each file's signature, so a rerun downloads only new versions. Delete the CSV (or single lines) to force a redownload."}],
+ install:{cmd:`curl -L -o Get-ZimmermanTools.zip https://download.ericzimmermanstools.com/Get-ZimmermanTools.zip && tar -xf Get-ZimmermanTools.zip && powershell -ExecutionPolicy Bypass -File Get-ZimmermanTools.ps1 -Dest C:\\Tools\\EZ`}},
+
+{id:"tool-ez-timeline-explorer", updated:"2026-07", cat:"Tools", title:"Timeline Explorer", team:"blue",
+ desc:"The analyst's CSV viewer: filter, group, sort, tag, and search million-row CSVs from the other EZ tools without Excel choking. Nearly every EZ workflow ends with “open the output in Timeline Explorer.”",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows","timeline"],
+ requires:{os:"Windows", tool:".NET 9 Desktop runtime"},
+ related:["tool-ez-suite","for-ez-workflow"],
+ install:{cmd:`curl -L -o TimelineExplorer.zip https://download.ericzimmermanstools.com/net9/TimelineExplorer.zip && tar -xf TimelineExplorer.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-pecmd", updated:"2026-07", cat:"Tools", title:"PECmd (Prefetch parser)", team:"blue",
+ desc:"Parses Windows Prefetch (.pf) files — proof a program ran: when, how many times, and which files and volumes it touched.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-prefetch"],
+ install:{cmd:`curl -L -o PECmd.zip https://download.ericzimmermanstools.com/net9/PECmd.zip && tar -xf PECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-evtxecmd", updated:"2026-07", cat:"Tools", title:"EvtxECmd (event log parser)", team:"blue",
+ desc:"Parses Windows event logs (.evtx) into normalized CSV/JSON using community “maps” that pull the useful fields out of each event type. Reads logs locked by a live system.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","logs"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-evtx"],
+ install:{cmd:`curl -L -o EvtxECmd.zip https://download.ericzimmermanstools.com/net9/EvtxECmd.zip && tar -xf EvtxECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-mftecmd", updated:"2026-07", cat:"Tools", title:"MFTECmd (NTFS metadata parser)", team:"blue",
+ desc:"Parses NTFS filesystem metadata — $MFT, $J (USN journal), $Boot, $SDS, $I30. The foundation of filesystem timelines; reads locked files on a live system.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","timeline"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-mft"],
+ install:{cmd:`curl -L -o MFTECmd.zip https://download.ericzimmermanstools.com/net9/MFTECmd.zip && tar -xf MFTECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-mft-explorer", updated:"2026-07", cat:"Tools", title:"MFT Explorer", team:"blue",
+ desc:"Graphical $MFT browser — explore NTFS metadata record by record. Use MFTECmd for bulk CSV output; use this to inspect individual records visually.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET 9 Desktop runtime"},
+ related:["tool-ez-suite","tool-ez-mftecmd"],
+ install:{cmd:`curl -L -o MFTExplorer.zip https://download.ericzimmermanstools.com/net9/MFTExplorer.zip && tar -xf MFTExplorer.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-recmd", updated:"2026-07", cat:"Tools", title:"RECmd (registry CLI)", team:"blue",
+ desc:"Command-line registry workhorse — search across hives, recover deleted keys, and run curated “batch files” (e.g. Kroll_Batch) that harvest hundreds of forensically interesting keys to one CSV. Handles locked hives and transaction logs.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","registry"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-registry","tool-ez-registry-explorer"],
+ install:{cmd:`curl -L -o RECmd.zip https://download.ericzimmermanstools.com/net9/RECmd.zip && tar -xf RECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-registry-explorer", updated:"2026-07", cat:"Tools", title:"Registry Explorer", team:"blue",
+ desc:"GUI registry viewer built for forensics: load several hives at once, replay transaction logs, recover deleted keys/values, and jump straight to bookmarked keys investigators care about. Handles locked live hives.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows","registry"],
+ requires:{os:"Windows", tool:".NET 9 Desktop runtime"},
+ related:["tool-ez-suite","for-ez-registry","tool-ez-recmd"],
+ install:{cmd:`curl -L -o RegistryExplorer.zip https://download.ericzimmermanstools.com/net9/RegistryExplorer.zip && tar -xf RegistryExplorer.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-rla", updated:"2026-07", cat:"Tools", title:"RLA (registry log replayer)", team:"blue",
+ desc:"Replays registry transaction logs (.LOG1/.LOG2) into their hive so “dirty” hives pulled from images parse cleanly in tools that don't understand transaction logs.",
+ url:"https://ericzimmerman.github.io/", license:"free",
+ platforms:["windows"], tags:["forensics","tools","windows","registry"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-registry"],
+ install:{cmd:`curl -L -o rla.zip https://download.ericzimmermanstools.com/net9/rla.zip && tar -xf rla.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-amcacheparser", updated:"2026-07", cat:"Tools", title:"AmcacheParser", team:"blue",
+ desc:"Parses Amcache.hve — a registry hive recording programs present on (and often executed from) the system, including SHA-1 hashes you can pivot to VirusTotal. Survives deletion of the program itself; handles locked files.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","registry"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-amcache-shimcache"],
+ install:{cmd:`curl -L -o AmcacheParser.zip https://download.ericzimmermanstools.com/net9/AmcacheParser.zip && tar -xf AmcacheParser.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-appcompatcacheparser", updated:"2026-07", cat:"Tools", title:"AppCompatCacheParser (ShimCache)", team:"blue",
+ desc:"Parses the AppCompatCache (ShimCache) from the SYSTEM hive — evidence that an executable existed on disk, even after it was deleted. Handles locked hives on a live box.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","registry"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-amcache-shimcache"],
+ install:{cmd:`curl -L -o AppCompatCacheParser.zip https://download.ericzimmermanstools.com/net9/AppCompatCacheParser.zip && tar -xf AppCompatCacheParser.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-lecmd", updated:"2026-07", cat:"Tools", title:"LECmd (LNK file parser)", team:"blue",
+ desc:"Parses Windows shortcut (.lnk) files — each records its target's path, timestamps, size, and the volume it lived on, even for files and USB drives long gone.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-lnk-jumplists"],
+ install:{cmd:`curl -L -o LECmd.zip https://download.ericzimmermanstools.com/net9/LECmd.zip && tar -xf LECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-jlecmd", updated:"2026-07", cat:"Tools", title:"JLECmd (Jump List parser)", team:"blue",
+ desc:"Parses Jump Lists (Automatic/Custom Destinations) — each application's own list of recently opened documents, with paths and timestamps.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-lnk-jumplists","tool-ez-jumplist-explorer"],
+ install:{cmd:`curl -L -o JLECmd.zip https://download.ericzimmermanstools.com/net9/JLECmd.zip && tar -xf JLECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-jumplist-explorer", updated:"2026-07", cat:"Tools", title:"JumpList Explorer", team:"blue",
+ desc:"GUI Jump List viewer — browse per-application recent-document lists interactively. Use JLECmd when you want CSV instead.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET 9 Desktop runtime"},
+ related:["tool-ez-suite","tool-ez-jlecmd"],
+ install:{cmd:`curl -L -o JumpListExplorer.zip https://download.ericzimmermanstools.com/net9/JumpListExplorer.zip && tar -xf JumpListExplorer.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-sbecmd", updated:"2026-07", cat:"Tools", title:"SBECmd (ShellBags CLI)", team:"blue",
+ desc:"Command-line ShellBags parser — exports every folder a user browsed in Explorer (including since-deleted folders) to CSV, per user profile.",
+ url:"https://ericzimmerman.github.io/", license:"free",
+ platforms:["windows"], tags:["forensics","tools","windows","registry"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-shellbags","tool-ez-shellbags-explorer"],
+ install:{cmd:`curl -L -o SBECmd.zip https://download.ericzimmermanstools.com/net9/SBECmd.zip && tar -xf SBECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-shellbags-explorer", updated:"2026-07", cat:"Tools", title:"ShellBags Explorer", team:"blue",
+ desc:"GUI for browsing ShellBags data as a folder tree — see what the user's Explorer knew about, with first/last-visited timestamps. Handles locked live hives.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows","registry"],
+ requires:{os:"Windows", tool:".NET 9 Desktop runtime"},
+ related:["tool-ez-suite","for-ez-shellbags","tool-ez-sbecmd"],
+ install:{cmd:`curl -L -o ShellBagsExplorer.zip https://download.ericzimmermanstools.com/net9/ShellBagsExplorer.zip && tar -xf ShellBagsExplorer.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-rbcmd", updated:"2026-07", cat:"Tools", title:"RBCmd (Recycle Bin parser)", team:"blue",
+ desc:"Parses Recycle Bin artifacts ($I files and legacy INFO2) — original path, size, and deletion time of everything users recycled.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","recovery"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-recyclebin"],
+ install:{cmd:`curl -L -o RBCmd.zip https://download.ericzimmermanstools.com/net9/RBCmd.zip && tar -xf RBCmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-srumecmd", updated:"2026-07", cat:"Tools", title:"SrumECmd (SRUM parser)", team:"blue",
+ desc:"Parses SRUDB.dat (System Resource Usage Monitor) — Windows' own ~30-60 day record of per-application network bytes, CPU time, and energy use. Superb for spotting exfiltration after the fact.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","network"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-srum"],
+ install:{cmd:`curl -L -o SrumECmd.zip https://download.ericzimmermanstools.com/net9/SrumECmd.zip && tar -xf SrumECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-sumecmd", updated:"2026-07", cat:"Tools", title:"SumECmd (User Access Logs parser)", team:"blue",
+ desc:"Parses Microsoft User Access Logs (SUM) from Windows Server (C:\\Windows\\System32\\LogFiles\\SUM) — per-user, per-IP access counts to server roles. A sleeper hit in intrusion cases on servers.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","logs"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-evtx"],
+ install:{cmd:`curl -L -o SumECmd.zip https://download.ericzimmermanstools.com/net9/SumECmd.zip && tar -xf SumECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-sqlecmd", updated:"2026-07", cat:"Tools", title:"SQLECmd (SQLite parser)", team:"blue",
+ desc:"Finds and parses SQLite databases using community maps — browser history, chat apps, and hundreds of other application databases straight to CSV without writing a single query.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-workflow"],
+ install:{cmd:`curl -L -o SQLECmd.zip https://download.ericzimmermanstools.com/net9/SQLECmd.zip && tar -xf SQLECmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-wxtcmd", updated:"2026-07", cat:"Tools", title:"WxTCmd (Windows Timeline parser)", team:"blue",
+ desc:"Parses the Windows 10 Timeline database (ActivitiesCache.db) — per-user application usage and focus periods, another quiet record of what ran and when.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","timeline"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-workflow"],
+ install:{cmd:`curl -L -o WxTCmd.zip https://download.ericzimmermanstools.com/net9/WxTCmd.zip && tar -xf WxTCmd.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-recentfilecacheparser", updated:"2026-07", cat:"Tools", title:"RecentFileCacheParser", team:"blue",
+ desc:"Parses RecentFileCache.bcf — a Windows 7-era artifact recording recently executed programs. Still worth a look on older systems and images.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite","for-ez-amcache-shimcache"],
+ install:{cmd:`curl -L -o RecentFileCacheParser.zip https://download.ericzimmermanstools.com/net9/RecentFileCacheParser.zip && tar -xf RecentFileCacheParser.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-vscmount", updated:"2026-07", cat:"Tools", title:"VSCMount (shadow copy mounter)", team:"blue",
+ desc:"Mounts every Volume Shadow Copy on a drive as a folder tree, so older versions of files, hives, and logs become browsable — and parseable with the rest of the suite.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","recovery"],
+ requires:{os:"Windows", tool:".NET 9 runtime", elevation:true},
+ related:["tool-ez-suite","for-ez-vsc"],
+ install:{cmd:`curl -L -o VSCMount.zip https://download.ericzimmermanstools.com/net9/VSCMount.zip && tar -xf VSCMount.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-bstrings", updated:"2026-07", cat:"Tools", title:"bstrings", team:"blue",
+ desc:"strings on steroids: extract ASCII/Unicode strings from any file with built-in regex patterns for IPs, URLs, emails, GUIDs, and more — great for carving leads out of memory dumps and unknown binaries.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","memory"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite"],
+ install:{cmd:`curl -L -o bstrings.zip https://download.ericzimmermanstools.com/net9/bstrings.zip && tar -xf bstrings.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-ezviewer", updated:"2026-07", cat:"Tools", title:"EZViewer", team:"blue",
+ desc:"Zero-dependency viewer for .doc/.docx, .xls/.xlsx, .csv, .pdf, .rtf, html and text; anything unsupported opens in a hex view with a data interpreter. Handy on an analysis box with no Office installed.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET 9 Desktop runtime"},
+ related:["tool-ez-suite"],
+ install:{cmd:`curl -L -o EZViewer.zip https://download.ericzimmermanstools.com/net9/EZViewer.zip && tar -xf EZViewer.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-hasher", updated:"2026-07", cat:"Tools", title:"Hasher", team:"blue",
+ desc:"GUI hashing tool — hash files or whole folders with multiple algorithms at once. .NET Framework build only.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET Framework 4.7.2+"},
+ related:["tool-ez-suite","for-hashdir"],
+ install:{cmd:`curl -L -o hasher.zip https://download.ericzimmermanstools.com/hasher.zip && tar -xf hasher.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-sdb-explorer", updated:"2026-07", cat:"Tools", title:"SDB Explorer", team:"blue",
+ desc:"GUI for shim database (.sdb) files. Application shims are a legitimate compatibility feature that attackers abuse for persistence — this is the tool to inspect a suspicious custom shim.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows","persistence"],
+ attack:["T1546.011"],
+ requires:{os:"Windows", tool:".NET 9 Desktop runtime"},
+ related:["tool-ez-suite"],
+ install:{cmd:`curl -L -o SDBExplorer.zip https://download.ericzimmermanstools.com/net9/SDBExplorer.zip && tar -xf SDBExplorer.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-iisgeolocate", updated:"2026-07", cat:"Tools", title:"iisGeolocate", team:"blue",
+ desc:"Geolocates IP addresses found in IIS logs and extracts unique addresses — quick triage of who was talking to your web server and from where.",
+ url:"https://ericzimmerman.github.io/", license:"open source (MIT)",
+ platforms:["windows"], tags:["forensics","tools","windows","logs","network"],
+ requires:{os:"Windows", tool:".NET 9 runtime"},
+ related:["tool-ez-suite"],
+ install:{cmd:`curl -L -o iisGeolocate.zip https://download.ericzimmermanstools.com/net9/iisGeolocate.zip && tar -xf iisGeolocate.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-timeapp", updated:"2026-07", cat:"Tools", title:"TimeApp", team:"blue",
+ desc:"A simple app showing current local and UTC time (and optionally your public IP). Keep it on screen during evidence collection so every screenshot self-documents its time.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET Framework 4.7.2+"},
+ related:["tool-ez-suite"],
+ install:{cmd:`curl -L -o TimeApp.zip https://download.ericzimmermanstools.com/TimeApp.zip && tar -xf TimeApp.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-ez-xwfim", updated:"2026-07", cat:"Tools", title:"XWFIM (X-Ways installation manager)", team:"blue",
+ desc:"Installation manager for X-Ways Forensics — downloads, installs, and updates X-Ways cleanly. Only useful if you're an X-Ways shop.",
+ url:"https://ericzimmerman.github.io/", license:"free (closed source)",
+ platforms:["windows"], tags:["forensics","tools","windows"],
+ requires:{os:"Windows", tool:".NET Framework 4.7.2+"},
+ related:["tool-ez-suite"],
+ install:{cmd:`curl -L -o XWFIM.zip https://download.ericzimmermanstools.com/XWFIM.zip && tar -xf XWFIM.zip
+:: or grab the whole suite at once — see the "Get-ZimmermanTools" entry`}},
+
+{id:"tool-kape", updated:"2026-07", cat:"Tools", title:"KAPE (Kroll Artifact Parser and Extractor)", team:"blue",
+ desc:"High-speed triage collector and processing engine: “targets” grab forensic artifacts from live systems or images in minutes, “modules” then run parsers (including the whole EZ suite) over them. The standard front-end for EZ Tools at scale. Free but license-gated via Kroll's site.",
+ url:"https://www.kroll.com/en/services/cyber-risk/incident-response-litigation-support/kroll-artifact-parser-extractor-kape", license:"free for internal use (Kroll EULA)",
+ platforms:["windows"], tags:["forensics","tools","windows","triage","incident-response"],
+ requires:{os:"Windows", elevation:true},
+ related:["tool-ez-suite","for-ez-workflow"],
+ install:{cmd:`curl -L -o kape.zip https://kape.zip && tar -xf kape.zip
+:: kape.zip is the official short link from ericzimmerman.github.io; review Kroll's EULA before commercial use`}},
+
+/* ---------- FORENSICS — EZ TOOLS WORKFLOWS ---------- */
+{id:"for-ez-workflow", updated:"2026-07", level:"beginner", cat:"Forensics", title:"EZ Tools triage workflow (start here)", team:"blue",
+ desc:"The one pattern behind every Eric Zimmerman tool: point a parser at an artifact, write CSV into a single case folder, review it all in Timeline Explorer. Learn it once and you know the whole suite.",
+ tags:["forensics","triage","timeline"],
+ requires:{os:"Windows", tool:"EZ Tools suite"},
+ related:["tool-ez-suite","tool-ez-timeline-explorer","for-ez-prefetch","for-ez-evtx","for-ez-mft"],
+ code:{
+  ps:`# Every EZ CLI tool follows the same shape:
+#   <Tool>.exe -f <file>  (or -d <directory>)  --csv <output folder>
+# and prints full help when run with no arguments.
+$ez  = "{{EZ:C:\\Tools\\EZ\\net9}}"      # where Get-ZimmermanTools put the net9 builds
+$out = "{{OUT:C:\\Cases\\host01}}"       # one folder collects every tool's CSV
+
+# parse a couple of quick wins into the case folder:
+& "$ez\\PECmd.exe" -d C:\\Windows\\Prefetch --csv $out
+& "$ez\\EvtxECmd\\EvtxECmd.exe" -d C:\\Windows\\System32\\winevt\\Logs --csv $out
+
+# review: Timeline Explorer opens huge CSVs with filtering/grouping built for this
+& "$ez\\TimelineExplorer\\TimelineExplorer.exe" (Get-ChildItem $out -Filter *.csv).FullName`
+ }},
+
+{id:"for-ez-prefetch", updated:"2026-07", level:"intermediate", cat:"Forensics", title:"Prefetch deep-dive with PECmd", team:"blue",
+ desc:"Prefetch proves a program ran: the last 8 run times, a run count, and every file and volume it touched. PECmd parses one .pf or the whole folder to CSV.",
+ tags:["forensics","triage","timeline"],
+ requires:{os:"Windows", tool:"PECmd (EZ Tools)", elevation:true},
+ related:["for-prefetch","tool-ez-pecmd","for-ez-workflow","for-ez-amcache-shimcache"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# one file, full detail in the console:
+& "$ez\\PECmd.exe" -f "C:\\Windows\\Prefetch\\{{PF:CMD.EXE-4A81B364.pf}}"
+# whole folder -> CSV, plus a *_Timeline.csv you can stack with other tools' output:
+& "$ez\\PECmd.exe" -d C:\\Windows\\Prefetch --csv {{OUT:C:\\Cases\\host01}} --csvf prefetch.csv
+# what to look for: RunCount, LastRun and the 7 previous run times, and anything
+# in FilesLoaded pointing at odd paths (Temp, Downloads, user profiles)`
+ }},
+
+{id:"for-ez-evtx", updated:"2026-07", level:"intermediate", cat:"Forensics", title:"Event logs to CSV with EvtxECmd", team:"blue",
+ desc:"EvtxECmd turns .evtx logs into one normalized CSV using community maps, so a logon, a service install, and a log-clear all land in the same columns — ready to filter in Timeline Explorer.",
+ tags:["forensics","logs","triage","timeline"],
+ requires:{os:"Windows", tool:"EvtxECmd (EZ Tools)", elevation:true},
+ related:["for-evtx-export","for-logons","for-failed-logons","tool-ez-evtxecmd","for-ez-workflow"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# update the community maps first — new event types are mapped constantly:
+& "$ez\\EvtxECmd\\EvtxECmd.exe" --sync
+# one log:
+& "$ez\\EvtxECmd\\EvtxECmd.exe" -f C:\\Windows\\System32\\winevt\\Logs\\Security.evtx --csv {{OUT:C:\\Cases\\host01}}
+# every log on the box (locked live files are fine):
+& "$ez\\EvtxECmd\\EvtxECmd.exe" -d C:\\Windows\\System32\\winevt\\Logs --csv {{OUT:C:\\Cases\\host01}}
+# first filters to try in Timeline Explorer: EventId 4624/4625 (logons),
+# 7045 (new service), 4698 (new scheduled task), 1102 (audit log cleared)`
+ }},
+
+{id:"for-ez-mft", updated:"2026-07", level:"advanced", cat:"Forensics", title:"Filesystem timeline from $MFT with MFTECmd", team:"blue",
+ desc:"The $MFT records every file on an NTFS volume, with two sets of timestamps — one attackers can fake and one they usually can't. MFTECmd dumps it to CSV; comparing the two exposes timestomping.",
+ tags:["forensics","timeline","triage"],
+ attack:["T1070.006"],
+ requires:{os:"Windows", tool:"MFTECmd (EZ Tools)", elevation:true},
+ related:["tool-ez-mftecmd","for-ez-vsc","for-recent","for-ez-recyclebin"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# live system (admin) — MFTECmd reads the locked file directly:
+& "$ez\\MFTECmd.exe" -f 'C:\\$MFT' --csv {{OUT:C:\\Cases\\host01}} --csvf mft.csv
+# USN journal: a rolling log of recent creates, renames, and deletes:
+& "$ez\\MFTECmd.exe" -f 'C:\\$Extend\\$J' --csv {{OUT:C:\\Cases\\host01}} --csvf usnjrnl.csv
+# timestomp check, in the CSV: Created0x10 is what Explorer shows and is easy to fake;
+# Created0x30 is set by the filesystem. 0x10 EARLIER than 0x30 = classic faked timestamp.
+# inspect a single record in full detail (entry number from the CSV):
+& "$ez\\MFTECmd.exe" -f 'C:\\$MFT' --de {{ENTRY:12345}}`
+ }},
+
+{id:"for-ez-amcache-shimcache", updated:"2026-07", level:"intermediate", cat:"Forensics", title:"Execution evidence: Amcache + ShimCache", team:"blue",
+ desc:"Two registry artifacts that outlive file deletion: Amcache records programs with SHA-1 hashes; ShimCache records executables that existed on disk. Parse both when you need to prove a deleted tool was there.",
+ tags:["forensics","registry","triage"],
+ requires:{os:"Windows", tool:"AmcacheParser + AppCompatCacheParser (EZ Tools)", elevation:true},
+ related:["tool-ez-amcacheparser","tool-ez-appcompatcacheparser","for-ez-prefetch","for-installed"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# Amcache: programs present on the system, with SHA-1 you can pivot to VirusTotal
+& "$ez\\AmcacheParser.exe" -f C:\\Windows\\AppCompat\\Programs\\Amcache.hve -i --csv {{OUT:C:\\Cases\\host01}}
+# ShimCache: executables that existed on disk (reads the live SYSTEM hive by default)
+& "$ez\\AppCompatCacheParser.exe" --csv {{OUT:C:\\Cases\\host01}}
+# caution: on modern Windows neither is strict proof of *execution* —
+# read Amcache as "program was present (here's its hash)" and ShimCache as "file existed"`
+ }},
+
+{id:"for-ez-registry", updated:"2026-07", level:"intermediate", cat:"Forensics", title:"Registry sweep with RECmd batch files", team:"blue",
+ desc:"RECmd runs a curated “batch file” of registry queries across whole hive sets — Kroll_Batch alone covers hundreds of keys (run keys, USB history, typed paths, services…) — and writes one CSV. RLA cleans dirty hives first.",
+ tags:["forensics","registry","triage"],
+ requires:{os:"Windows", tool:"RECmd + RLA (EZ Tools)"},
+ related:["for-usb","tool-ez-recmd","tool-ez-rla","tool-ez-registry-explorer","for-ez-shellbags"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# hives copied out of an image are usually "dirty" — replay their transaction logs first:
+& "$ez\\rla.exe" -d {{HIVES:C:\\Cases\\host01\\hives}} --out {{HIVES:C:\\Cases\\host01\\hives}}-clean
+# run the community batch: hundreds of forensically interesting keys -> one CSV
+& "$ez\\RECmd\\RECmd.exe" --bn "$ez\\RECmd\\BatchExamples\\Kroll_Batch.reb" -d {{HIVES:C:\\Cases\\host01\\hives}}-clean --csv {{OUT:C:\\Cases\\host01}}
+# ad-hoc: search key names, value names, and value data across every hive at once
+& "$ez\\RECmd\\RECmd.exe" -d {{HIVES:C:\\Cases\\host01\\hives}} --sd "{{TERM:powershell}}" --csv {{OUT:C:\\Cases\\host01}}
+# prefer a GUI? Registry Explorer opens the same hives with deleted-key recovery`
+ }},
+
+{id:"for-ez-shellbags", updated:"2026-07", level:"intermediate", cat:"Forensics", title:"Folder access history from ShellBags", team:"blue",
+ desc:"Windows remembers every folder a user browsed in Explorer — with first/last-visited times — even after the folder is deleted. Strong evidence of data staging, USB browsing, or snooping.",
+ tags:["forensics","registry","triage"],
+ requires:{os:"Windows", tool:"SBECmd (EZ Tools)"},
+ related:["tool-ez-sbecmd","tool-ez-shellbags-explorer","for-ez-lnk-jumplists","for-ez-registry"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# live: parse ShellBags for every user profile on the box
+& "$ez\\SBECmd.exe" -l --csv {{OUT:C:\\Cases\\host01}}
+# offline: point it at a folder of exported UsrClass.dat / NTUSER.DAT hives
+& "$ez\\SBECmd.exe" -d {{HIVES:C:\\Cases\\host01\\hives}} --csv {{OUT:C:\\Cases\\host01}}
+# look for: paths that no longer exist, other users' profiles, and network/USB paths`
+ }},
+
+{id:"for-ez-lnk-jumplists", updated:"2026-07", level:"intermediate", cat:"Forensics", title:"Recently opened files: LNK + Jump Lists", team:"blue",
+ desc:"Every file opened from Explorer leaves a .lnk shortcut, and each app keeps a Jump List of recent documents. Both record paths, timestamps, and volume serials — including USB devices and files long deleted.",
+ tags:["forensics","triage","timeline"],
+ requires:{os:"Windows", tool:"LECmd + JLECmd (EZ Tools)"},
+ related:["for-usb","tool-ez-lecmd","tool-ez-jlecmd","for-ez-shellbags"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+$recent = "C:\\Users\\{{USER:alice}}\\AppData\\Roaming\\Microsoft\\Windows\\Recent"
+& "$ez\\LECmd.exe"  -d $recent --csv {{OUT:C:\\Cases\\host01}} --csvf lnk.csv
+& "$ez\\JLECmd.exe" -d "$recent\\AutomaticDestinations" --csv {{OUT:C:\\Cases\\host01}} --csvf jumplists.csv
+# look for: TargetCreated vs TargetModified, drive letters + volume serials that
+# match USB device history, and paths under other users' profiles or network shares`
+ }},
+
+{id:"for-ez-recyclebin", updated:"2026-07", level:"intermediate", cat:"Forensics", title:"What was deleted: Recycle Bin parsing", team:"blue",
+ desc:"Each recycled file leaves an $I record: original path, size, and exact deletion time. RBCmd reads them for every user SID on the volume — deletions users think are gone.",
+ tags:["forensics","recovery","triage"],
+ requires:{os:"Windows", tool:"RBCmd (EZ Tools)", elevation:true},
+ related:["tool-ez-rbcmd","for-ez-mft"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# every user's recycle bin on the volume ($Recycle.Bin is per-SID, needs admin):
+& "$ez\\RBCmd.exe" -d 'C:\\$Recycle.Bin' -q --csv {{OUT:C:\\Cases\\host01}}
+# a single $I record in detail:
+& "$ez\\RBCmd.exe" -f 'C:\\$Recycle.Bin\\{{SID:S-1-5-21-...}}\\{{IFILE:$IABCDEF.txt}}'
+# pair with the USN journal (for-ez-mft): recycle = rename into $Recycle.Bin,
+# so $J shows deletions even after the bin is emptied`
+ }},
+
+{id:"for-ez-srum", updated:"2026-07", level:"advanced", cat:"Forensics", title:"Network & app usage history from SRUM", team:"blue",
+ desc:"Windows quietly keeps ~30-60 days of per-application network bytes, CPU time, and energy use in SRUDB.dat. The fastest way to spot the process that uploaded gigabytes last Tuesday.",
+ tags:["forensics","network","triage"],
+ requires:{os:"Windows", tool:"SrumECmd (EZ Tools)", elevation:true},
+ related:["tool-ez-srumecmd","for-ez-evtx"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# SRUDB.dat is locked on a live box — export copies first (or pull from an image / shadow copy):
+#   source: C:\\Windows\\System32\\sru\\SRUDB.dat  and  C:\\Windows\\System32\\config\\SOFTWARE
+& "$ez\\SrumECmd.exe" -f {{SRUM:C:\\Cases\\host01\\SRUDB.dat}} -r {{SOFT:C:\\Cases\\host01\\SOFTWARE}} --csv {{OUT:C:\\Cases\\host01}}
+# start with the NetworkUsages CSV: sort by BytesSent descending and ask
+# "should that application be talking that much?" (-r adds app-name resolution)`
+ }},
+
+{id:"for-ez-vsc", updated:"2026-07", level:"advanced", cat:"Forensics", title:"Reach back in time with shadow copies", team:"blue",
+ desc:"Volume Shadow Copies are point-in-time snapshots of the disk. Mount them with VSCMount and last week's registry hives, event logs, and “deleted” files are simply there — parseable with the same EZ tools.",
+ danger:"Creates mount-point directories under the chosen path; clean them up when the case closes.",
+ tags:["forensics","recovery","timeline"],
+ requires:{os:"Windows", tool:"VSCMount (EZ Tools)", elevation:true},
+ related:["tool-ez-vscmount","for-ez-mft","for-ez-registry","for-ez-srum"],
+ code:{
+  ps:`$ez = "{{EZ:C:\\Tools\\EZ\\net9}}"
+# what snapshots exist?
+vssadmin list shadows /for=C:
+# mount them all under one folder (--ud stamps each mount with its snapshot date):
+& "$ez\\VSCMount.exe" --dl C --mp C:\\VSCs --ud
+# now parse a snapshot like a normal drive — e.g. Prefetch as it looked days ago:
+& "$ez\\PECmd.exe" -d C:\\VSCs\\{{VSC:vss001}}\\Windows\\Prefetch --csv {{OUT:C:\\Cases\\host01}}`
+ }}
 ];
