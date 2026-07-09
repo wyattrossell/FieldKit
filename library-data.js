@@ -330,14 +330,20 @@ print(h.hexdigest())`
 /* ---------- PROCESSES & SERVICES ---------- */
 {id:"proc-top", level:"beginner", cat:"Processes & Services", title:"Top processes by CPU / memory",
  desc:"See what's actually eating the machine right now.",
+ example_output:`Process       Id  CPU(s)  RAM(MB)
+-------       --  ------  -------
+chrome      8124   463.9   1843.1
+Code        3984   253.5    176.7
+svchost      980    12.4     88.0`,
  code:{
   ps:`Get-Process | Sort-Object CPU -Descending |
-  Select-Object -First 15 Name, Id,
-    @{n='CPU_s';e={[math]::Round($_.CPU,1)}},
-    @{n='RAM_MB';e={[math]::Round($_.WorkingSet64/1MB,1)}}`,
-  cmd:`tasklist /v /fo table | more`,
-  mac:`ps aux -r | head -16   # BSD ps: -r sorts by CPU`,
-  linux:`ps aux --sort=-%cpu | head -16`
+  Select-Object -First 15 @{n='Process';e={$_.Name}}, Id,
+    @{n='CPU(s)';e={[math]::Round($_.CPU,1)}},
+    @{n='RAM(MB)';e={[math]::Round($_.WorkingSet64/1MB,1)}} |
+  Format-Table -AutoSize`,
+  cmd:`tasklist /fo table`,
+  mac:`ps -Ao pid,%cpu,%mem,comm -r | head -16`,
+  linux:`ps -eo pid,%cpu,%mem,comm --sort=-%cpu | head -16`
  }},
 {id:"proc-kill", level:"beginner", cat:"Processes & Services", title:"Kill a process by name",
  desc:"Force-stop a hung application.",
@@ -350,11 +356,16 @@ print(h.hexdigest())`
  }},
 {id:"proc-services", level:"beginner", cat:"Processes & Services", title:"Running services",
  desc:"List services currently in the running state.",
+ example_output:`Display Name    Service   Status
+------------    -------   ------
+DNS Client      Dnscache  Running
+Print Spooler   Spooler   Running
+Windows Time    W32Time   Running`,
  code:{
-  ps:`Get-Service | Where-Object Status -eq 'Running' |
-  Select-Object Status, Name, DisplayName | Sort-Object DisplayName`,
+  ps:`Get-Service | Where-Object Status -eq 'Running' | Sort-Object DisplayName |
+  Format-Table -AutoSize @{n='Display Name';e={$_.DisplayName}}, @{n='Service';e={$_.Name}}, Status`,
   cmd:`net start`,
-  mac:`launchctl list`,
+  mac:`launchctl list | column -t`,
   linux:`systemctl list-units --type=service --state=running --no-pager`
  }},
 {id:"proc-restart-svc", level:"beginner",requires:{"elevation":true}, cat:"Processes & Services", title:"Restart a service",
@@ -370,12 +381,17 @@ systemctl is-active cups`
  }},
 {id:"proc-startup", level:"beginner", cat:"Processes & Services", title:"Startup / autorun items",
  desc:"What launches at boot or logon — a common malware hiding spot.",
+ example_output:`Name       Command                            Location  User
+----       -------                            --------  ----
+OneDrive   C:\\Users\\...\\OneDrive.exe           Run       DESKTOP\\Wyatt
+Steam      C:\\Program Files\\...\\Steam.exe      Run       DESKTOP\\Wyatt`,
  code:{
   ps:`Get-CimInstance Win32_StartupCommand |
-  Select-Object Name, Command, Location, User`,
-  cmd:`wmic startup get caption,command,location`,
-  mac:`launchctl list
-echo "-- launch agents / daemons --"
+  Format-Table -AutoSize -Wrap Name, Command, Location, User`,
+  cmd:`reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+reg query "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"`,
+  mac:`launchctl list | column -t
+echo "-- LaunchAgents / LaunchDaemons --"
 ls -1 ~/Library/LaunchAgents /Library/LaunchAgents /Library/LaunchDaemons 2>/dev/null`,
   linux:`systemctl list-unit-files --state=enabled --no-pager
 ls -la ~/.config/autostart/ 2>/dev/null`
@@ -996,21 +1012,32 @@ sudo chown user:group file`
 /* ---------- PROCESSES & SERVICES (added) ---------- */
 {id:"proc-tree", level:"beginner", cat:"Processes & Services", title:"Process tree (parent → child)",
  desc:"See process parentage — spot what spawned a suspicious child.",
+ example_output:` PID  PPID  Process       Parent
+ ---  ----  -------       ------
+   4     0  System        System Idle Process
+ 780     4  smss.exe      System
+5120   780  explorer.exe  winlogon.exe
+7332  5120  chrome.exe    explorer.exe`,
  code:{
-  ps:`Get-CimInstance Win32_Process |
-  Select-Object ProcessId, ParentProcessId, Name |
-  Sort-Object ParentProcessId, ProcessId`,
-  cmd:`wmic process get Name,ProcessId,ParentProcessId
-:: wmic deprecated; PowerShell Get-CimInstance Win32_Process is preferred`,
-  mac:`ps -axo pid,ppid,user,command`,
+  ps:`$procs = Get-CimInstance Win32_Process
+$procs | Sort-Object ParentProcessId, ProcessId |
+  Format-Table -AutoSize @{n='PID';e={$_.ProcessId}}, @{n='PPID';e={$_.ParentProcessId}},
+    @{n='Process';e={$_.Name}}, @{n='Parent';e={($procs | Where-Object ProcessId -eq $_.ParentProcessId).Name}}`,
+  cmd:`tasklist /fo table
+:: cmd has no parent-PID view — use the PowerShell tab for a parent-child tree`,
+  mac:`ps -axo pid,ppid,user,comm | head -40`,
   linux:`ps -e --forest -o pid,ppid,user,cmd    # or: pstree -p`
  }},
 {id:"proc-find-port", level:"beginner",requires:{"elevation":true}, cat:"Processes & Services", title:"Find the process using a port",
  desc:"Identify what's bound to a port — resolve 'address already in use'. Edit the port.",
+ example_output:`LocalPort  State   OwningProcess  Process
+---------  -----   -------------  -------
+      443  Listen           4820  nginx`,
  code:{
-  ps:`Get-NetTCPConnection -LocalPort 443 |
+  ps:`Get-NetTCPConnection -LocalPort 443 -ErrorAction SilentlyContinue |
   Select-Object LocalPort, State, OwningProcess,
-    @{n='Process';e={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}}`,
+    @{n='Process';e={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} |
+  Format-Table -AutoSize`,
   cmd:`netstat -ano | findstr :443
 :: map the PID from the last column:
 tasklist /fi "PID eq 1234"`,
@@ -1032,9 +1059,13 @@ tasklist /fi "PID eq 1234"`,
  }},
 {id:"svc-failed", level:"beginner", cat:"Processes & Services", title:"Failed / not-running auto services",
  desc:"Services set to auto-start that aren't running — post-boot triage.",
+ example_output:`Display Name     Service   Status
+------------     -------   ------
+Print Spooler    Spooler   Stopped
+Windows Search   WSearch   Stopped`,
  code:{
-  ps:`Get-Service | Where-Object { $_.StartType -eq 'Automatic' -and $_.Status -ne 'Running' } |
-  Select-Object Name, DisplayName, Status`,
+  ps:`Get-Service | Where-Object { $_.StartType -eq 'Automatic' -and $_.Status -ne 'Running' } | Sort-Object DisplayName |
+  Format-Table -AutoSize @{n='Display Name';e={$_.DisplayName}}, @{n='Service';e={$_.Name}}, Status`,
   mac:`# nonzero last-exit-status = a job that failed:
 launchctl list | awk 'NR==1 || ($1!="-" && $2+0!=0)'`,
   linux:`systemctl --failed --no-pager`
