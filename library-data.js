@@ -263,12 +263,18 @@ print("Elevated" if admin else "NOT elevated")`
 /* ---------- DISK & FILES ---------- */
 {id:"disk-usage", level:"beginner", cat:"Disk & Files", title:"Disk usage / free space",
  desc:"Capacity and free space per volume.",
+ example_output:`DriveLetter FileSystemLabel Size(GB) Free(GB) Used%
+----------- --------------- -------- -------- -----
+C           Windows-SSD        951.6    220.9    77
+D           Data              1863.0   1520.1    18`,
  code:{
-  ps:`Get-Volume | Where-Object DriveLetter |
-  Select-Object DriveLetter, FileSystemLabel,
-    @{n='Size_GB';e={[math]::Round($_.Size/1GB,1)}},
-    @{n='Free_GB';e={[math]::Round($_.SizeRemaining/1GB,1)}}`,
-  cmd:`wmic logicaldisk get caption,volumename,size,freespace`,
+  ps:`Get-Volume | Where-Object DriveLetter | Sort-Object DriveLetter |
+  Format-Table -AutoSize DriveLetter, FileSystemLabel,
+    @{n='Size(GB)';e={[math]::Round($_.Size/1GB,1)}},
+    @{n='Free(GB)';e={[math]::Round($_.SizeRemaining/1GB,1)}},
+    @{n='Used%';e={if($_.Size){[math]::Round(($_.Size-$_.SizeRemaining)/$_.Size*100)}else{0}}}`,
+  cmd:`wmic logicaldisk get Caption,VolumeName,FreeSpace,Size
+:: wmic may be absent on newer Windows — the PowerShell tab is the modern equivalent`,
   mac:`df -h
 echo "-- volumes --"; diskutil list`,
   linux:`df -hT -x tmpfs -x devtmpfs`,
@@ -283,10 +289,16 @@ for d in drives:
  }},
 {id:"disk-large", level:"beginner", cat:"Disk & Files", title:"Find the largest files",
  desc:"Top space hogs under the current folder — cleanup triage.",
+ example_output:`Size(MB) File
+-------- ----
+ 1843.1  .\\vm\\disk.vhdx
+  742.6  .\\downloads\\installer.iso
+  128.4  .\\logs\\trace.log`,
  code:{
   ps:`Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue |
-  Sort-Object Length -Descending | Select-Object -First 20 FullName,
-    @{n='MB';e={[math]::Round($_.Length/1MB,1)}}`,
+  Sort-Object Length -Descending |
+  Select-Object -First 20 @{n='Size(MB)';e={[math]::Round($_.Length/1MB,1)}}, @{n='File';e={Resolve-Path -Relative $_.FullName}} |
+  Format-Table -AutoSize`,
   mac:`du -ah . 2>/dev/null | sort -rh | head -20`,
   linux:`du -ah . 2>/dev/null | sort -rh | head -20`,
   py:`import os
@@ -301,10 +313,16 @@ for size,p in sorted(files,reverse=True)[:20]:
  }},
 {id:"disk-findext", level:"beginner", cat:"Disk & Files", title:"Find files by extension",
  desc:"Recursively locate all files of a given type.",
+ example_output:`Modified          Size(KB) File
+--------          -------- ----
+2026-07-08 14:52       128 .\\logs\\app.log
+2026-07-07 09:11        42 .\\logs\\error.log`,
  code:{
-  ps:`Get-ChildItem -Path . -Recurse -Filter *.log -File |
-  Select-Object FullName, LastWriteTime, Length`,
-  cmd:`dir /s /b *.log`,
+  ps:`Get-ChildItem -Path . -Recurse -Filter *.log -File -ErrorAction SilentlyContinue |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object @{n='Modified';e={$_.LastWriteTime.ToString('yyyy-MM-dd HH:mm')}}, @{n='Size(KB)';e={[math]::Round($_.Length/1KB)}}, @{n='File';e={Resolve-Path -Relative $_.FullName}} |
+  Format-Table -AutoSize`,
+  cmd:`dir /s /o-d *.log`,
   mac:`# -printf is GNU-only; use BSD stat for the mtime:
 find . -type f -name '*.log' -exec stat -f '%Sm  %N' {} +`,
   linux:`find . -type f -name '*.log' -printf '%TY-%Tm-%Td  %p\\n'`,
@@ -919,12 +937,17 @@ sudo launchctl bootout user/$(id -u techuser) 2>/dev/null || sudo pkill -KILL -u
 /* ---------- DISK & FILES (added) ---------- */
 {id:"disk-tree", level:"beginner", cat:"Disk & Files", title:"Folder size breakdown",
  desc:"Total size of each immediate subfolder — find what's eating a directory.",
+ example_output:`Folder        Size(MB)
+------        --------
+node_modules     842.6
+assets           128.4
+src               12.1`,
  code:{
   ps:`Get-ChildItem -Directory | ForEach-Object {
   $mb=[math]::Round(((Get-ChildItem $_.FullName -Recurse -File -ErrorAction SilentlyContinue |
     Measure-Object Length -Sum).Sum)/1MB,1)
-  [pscustomobject]@{Folder=$_.Name; MB=$mb}
-} | Sort-Object MB -Descending`,
+  [pscustomobject]@{Folder=$_.Name; 'Size(MB)'=$mb}
+} | Sort-Object 'Size(MB)' -Descending | Format-Table -AutoSize`,
   mac:`du -h -d1 . | sort -h`,
   linux:`du -h --max-depth=1 . | sort -h`,
   py:`import os
@@ -994,8 +1017,14 @@ shutil.unpack_archive("out.zip","dest")`
 {id:"file-perms", level:"beginner",requires:{"elevation":true}, cat:"Disk & Files", title:"View / change file permissions",
  desc:"Inspect ACLs/mode and grant access. Edit the target and principal.",
  danger:"Changing ownership or ACLs can lock users out of files. Others' files need elevation.",
+ example_output:`Identity                 Rights       Type
+--------                 ------       ----
+NT AUTHORITY\\SYSTEM       FullControl  Allow
+BUILTIN\\Administrators    FullControl  Allow
+DESKTOP\\Wyatt             Modify       Allow`,
  code:{
-  ps:`Get-Acl .\\file | Format-List
+  ps:`(Get-Acl .\\file).Access |
+  Format-Table -AutoSize @{n='Identity';e={$_.IdentityReference}}, @{n='Rights';e={$_.FileSystemRights}}, @{n='Type';e={$_.AccessControlType}}
 # grant a user full control:
 icacls .\\file /grant 'DOMAIN\\user:(F)'`,
   cmd:`icacls file
