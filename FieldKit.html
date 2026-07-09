@@ -717,6 +717,12 @@ function toggleFav(id){ favorites.has(id) ? favorites.delete(id) : favorites.add
 const $ = s => document.querySelector(s);
 const railEl=$("#rail"), listEl=$("#list"), detailEl=$("#detail"), tagbarEl=$("#tagbar");
 
+// id -> item lookup, lazily built and invalidated on any library mutation.
+// Replaces O(n) library.find() in the hot paths (select/detail/related/runbooks).
+let _byId=null;
+function reindex(){ _byId=null; }
+function getItem(id){ if(!_byId) _byId=new Map(library.map(i=>[i.id,i])); return _byId.get(id); }
+
 function langsOf(item){ return item.code ? Object.keys(LANGS).filter(l=>item.code[l]) : []; }
 function isWidget(item){ return !!item.widget; }
 function isTool(item){ return !item.widget && !item.code && !!(item.install || item.url); }
@@ -729,10 +735,16 @@ function matchesBase(item, opts){
   if(!opts.ignoreTags && activeTags.size && !(item.tags && [...activeTags].every(t=>item.tags.includes(t)))) return false;
   if(activeLangFilter!=="all" && !(item.code && item.code[activeLangFilter])) return false;
   if(query){
-    const codeText = item.code ? Object.values(item.code).join(" ")
-                   : item.install ? Object.values(item.install).join(" ") : "";
-    const hay=[item.title, item.desc, item.cat, (item.tags||[]).join(" "),
+    // memoized per item — the code strings are large, so recomputing this blob
+    // for ~1100 items on every keystroke was the main search cost. Edited/imported
+    // entries are new objects, so they recompute lazily on first search.
+    let hay=item._search;
+    if(hay===undefined){
+      const codeText = item.code ? Object.values(item.code).join(" ")
+                     : item.install ? Object.values(item.install).join(" ") : "";
+      hay=item._search=[item.title, item.desc, item.cat, (item.tags||[]).join(" "),
                (item.attack||[]).join(" "), codeText].join(" ").toLowerCase();
+    }
     if(!hay.includes(query)) return false;
   }
   return true;
@@ -873,7 +885,7 @@ function scriptFromEntries(entries, lang, title){
   return { text: head.concat(body).join("\n"), n, skipped:skipped.length };
 }
 function exportRunbook(name, lang){
-  const entries=(runbooks[name]||[]).map(id=>library.find(x=>x.id===id));
+  const entries=(runbooks[name]||[]).map(id=>getItem(id));
   const r=scriptFromEntries(entries, lang, `FieldKit runbook — ${name}`);
   download(`${slug(name)||"runbook"}.${LANGS[lang].ext}`, r.text);
   return {steps:r.n, skipped:r.skipped};
@@ -923,7 +935,7 @@ function renderRunbookModal(){
   const steps=runbooks[activeRunbook];
   const sel=`<select id="rb-select" aria-label="Select runbook">${names.map(nm=>`<option value="${esc(nm)}" ${nm===activeRunbook?"selected":""}>${esc(nm)} (${runbooks[nm].length})</option>`).join("")}</select>`;
   const stepsHtml = steps.length ? `<ol class="rb-steps">${steps.map((id,i)=>{
-    const e=library.find(x=>x.id===id);
+    const e=getItem(id);
     const title=e?e.title:`(missing entry: ${id})`;
     const cat=e?e.cat:"";
     const langs=e&&e.code?Object.keys(e.code).filter(l=>LANGS[l]).map(l=>LANGS[l].tag).join(" "):(e?"— (no code)":"");
@@ -1022,11 +1034,10 @@ function renderList(){
       <div class="chips">${chips}</div>
     </div>`;
   }).join("");
-  listEl.querySelectorAll(".item").forEach(el=>{
-    el.onclick=()=>select(el.dataset.id);
-  });
   wireClearFilters();
 }
+// one delegated handler (set once at boot) instead of re-binding every row each render
+function wireListClicks(){ listEl.onclick=e=>{ const it=e.target.closest(".item"); if(it) select(it.dataset.id); }; }
 function wireClearFilters(){
   const cf=$("#clearFilters");
   if(cf){ cf.onclick=clearAllFilters; cf.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); clearAllFilters(); } }; }
@@ -1034,7 +1045,7 @@ function wireClearFilters(){
 }
 
 function select(id){
-  const item=library.find(i=>i.id===id);
+  const item=getItem(id);
   if(!item) return;
   selectedId=id;
   const avail=langsOf(item);
@@ -1151,7 +1162,7 @@ function wireFav(item){
 function relatedBlock(item){
   if(!item.related || !item.related.length) return "";
   const links=item.related.map(id=>{
-    const r=library.find(x=>x.id===id); if(!r) return "";
+    const r=getItem(id); if(!r) return "";
     return `<button class="relbtn" data-rid="${esc(id)}">${esc(r.title)}</button>`;
   }).filter(Boolean).join("");
   if(!links) return "";
@@ -1162,7 +1173,7 @@ function wireRelated(){
 }
 
 function renderDetail(){
-  const item=library.find(i=>i.id===selectedId);
+  const item=getItem(selectedId);
   if(!item){ return; }
   if(isWidget(item)) return renderWidgetDetail(item);
   if(isTool(item)) return renderToolDetail(item);
@@ -1390,7 +1401,7 @@ let editingId=null;
 
 function openModal(id){
   editingId=id||null;
-  const item=id ? library.find(i=>i.id===id) : null;
+  const item=id ? getItem(id) : null;
   $("#catlist").innerHTML=[...new Set(library.map(i=>i.cat))].map(c=>`<option value="${esc(c)}">`).join("");
   $("#m-heading").textContent = item ? "Edit command" : "Add a snippet";
   $("#m-title").value  = item ? item.title : "";
@@ -1426,6 +1437,7 @@ $("#m-save").onclick=()=>{
   if(isOverride) entry.override=true;                            // an edited built-in
   const idx=library.findIndex(i=>i.id===entry.id);
   if(idx===-1) library.push(entry); else library[idx]=entry;
+  reindex();
   closeModal();
   renderRail(); renderList();
   if(selectedId===entry.id) select(entry.id);
@@ -1440,6 +1452,7 @@ $("#m-delete").onclick=()=>{
     if(orig) library[idx]={...orig};                             // revert an edited built-in
     else library.splice(idx,1);                                  // remove a pure custom
   }
+  reindex();
   closeModal();
   renderRail(); renderList();
   if(selectedId===id){
@@ -1632,6 +1645,7 @@ function mergeCustoms(list){
     if(idx === -1){ library.push(it); n++; }
     else if(library[idx].custom || it.override){ library[idx] = it; n++; }   // update our own / apply built-in overrides
   });
+  if(n) reindex();
   return n;
 }
 
@@ -1767,6 +1781,7 @@ renderRail();
 renderSessionBar();
 updateRunbookCount();
 applyOsDetectBtn();
+wireListClicks();
 renderList();
 if(!openFromHash()) showPlaceholder();   // deep-link to #id, else show the welcome screen
 tryReconnectFile();
