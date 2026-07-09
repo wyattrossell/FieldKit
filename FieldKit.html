@@ -1261,6 +1261,10 @@ function renderToolDetail(item){
         ${s.note?`<div class="wf-note">${esc(s.note)}</div>`:""}
       </li>`).join("")}</ol>
     </div>` : "";
+  const dm=(item.detect||item.mitigate) ? `<div class="dm">
+      ${item.detect?`<div class="dm-row"><span class="dm-k detect">Detect</span><span>${esc(item.detect)}</span></div>`:""}
+      ${item.mitigate?`<div class="dm-row"><span class="dm-k mitigate">Mitigate</span><span>${esc(item.mitigate)}</span></div>`:""}
+    </div>` : "";
   detailEl.innerHTML=`
     ${headBlock(item)}
     <div class="toolmeta">
@@ -1271,6 +1275,7 @@ function renderToolDetail(item){
     ${item.install?`<div class="insthdr">Install</div>`:""}
     ${inst}
     ${steps}
+    ${dm}
     ${relatedBlock(item)}`;
   detailEl.querySelectorAll(".inst-copy, .wf-copy").forEach(b=>{ b.onclick=()=>copyText(b.dataset.cmd, b); });
   wireFav(item); wireRelated();
