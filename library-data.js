@@ -65,9 +65,17 @@ sudo dmidecode -s system-product-name`
 /* ---------- NETWORK ---------- */
 {id:"net-ipconfig", level:"beginner", cat:"Network", title:"IP configuration (all adapters)",
  desc:"Addresses, gateways, DNS servers, and MACs for every interface.",
+ example_output:`InterfaceAlias     : Wi-Fi
+IPv4Address        : 192.168.1.20
+IPv4DefaultGateway : 192.168.1.1
+DNSServer          : 192.168.1.1
+
+Name  Status MacAddress        LinkSpeed
+----  ------ ----------        ---------
+Wi-Fi Up     AA-BB-CC-11-22-33 300 Mbps`,
  code:{
   ps:`Get-NetIPConfiguration | Format-List InterfaceAlias, IPv4Address, IPv4DefaultGateway, DNSServer
-Get-NetAdapter | Select-Object Name, Status, MacAddress, LinkSpeed`,
+Get-NetAdapter | Where-Object Status -eq 'Up' | Format-Table -AutoSize Name, Status, MacAddress, LinkSpeed`,
   cmd:`ipconfig /all`,
   mac:`ifconfig | grep -E '^[a-z]|inet '
 echo "-- routes --"; netstat -rn | grep -E '^default'
@@ -139,12 +147,18 @@ s.close()`
  }},
 {id:"net-listening", level:"beginner",requires:{"elevation":true}, cat:"Network", title:"Listening ports + owning process",
  desc:"What's accepting connections, and which PID owns it.",
+ example_output:`LocalAddress LocalPort Process   OwningProcess
+------------ --------- -------   -------------
+0.0.0.0            135 svchost            2608
+0.0.0.0            445 System                4
+127.0.0.1         5432 postgres           7845`,
  code:{
-  ps:`Get-NetTCPConnection -State Listen |
+  ps:`Get-NetTCPConnection -State Listen | Sort-Object LocalPort |
   Select-Object LocalAddress, LocalPort,
-    @{n='Process';e={(Get-Process -Id $_.OwningProcess).ProcessName}}, OwningProcess |
-  Sort-Object LocalPort`,
-  cmd:`netstat -ano | findstr LISTENING`,
+    @{n='Process';e={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}}, OwningProcess |
+  Format-Table -AutoSize`,
+  cmd:`netstat -abno | findstr LISTENING
+:: -b shows the owning program (run as admin)`,
   mac:`sudo lsof -nP -iTCP -sTCP:LISTEN`,
   linux:`ss -tulpn 2>/dev/null || sudo ss -tulpn`
  }},
@@ -162,10 +176,15 @@ for fam,_,_,_,addr in socket.getaddrinfo(name,None):
  }},
 {id:"net-arp", level:"beginner", cat:"Network", title:"ARP / neighbor table",
  desc:"Map local IPs to MAC addresses — spot devices on the LAN.",
+ example_output:`IPAddress     LinkLayerAddress   State
+---------     ----------------   -----
+192.168.1.1   F0-2F-74-41-E6-90  Reachable
+192.168.1.15  C8-E2-65-7A-D0-0F  Stale
+192.168.1.42  80-05-1F-62-6C-1A  Stale`,
  code:{
   ps:`Get-NetNeighbor -AddressFamily IPv4 |
-  Where-Object State -in 'Reachable','Stale' |
-  Select-Object IPAddress, LinkLayerAddress, State`,
+  Where-Object State -in 'Reachable','Stale' | Sort-Object IPAddress |
+  Format-Table -AutoSize IPAddress, LinkLayerAddress, State`,
   cmd:`arp -a`,
   mac:`arp -an`,
   linux:`ip neigh show`
@@ -692,21 +711,31 @@ sudo ipconfig set en0 DHCP`,
  }},
 {id:"net-routes", level:"beginner", cat:"Network", title:"Routing table",
  desc:"Active routes and the default gateway per interface.",
+ example_output:`DestinationPrefix NextHop      RouteMetric ifIndex
+----------------- -------      ----------- -------
+0.0.0.0/0         192.168.1.1           25      12
+192.168.1.0/24    0.0.0.0              256      12
+127.0.0.1/32      0.0.0.0              256       1`,
  code:{
-  ps:`Get-NetRoute -AddressFamily IPv4 |
-  Sort-Object RouteMetric |
-  Select-Object DestinationPrefix, NextHop, RouteMetric, ifIndex`,
+  ps:`Get-NetRoute -AddressFamily IPv4 | Sort-Object RouteMetric |
+  Format-Table -AutoSize DestinationPrefix, NextHop, RouteMetric, ifIndex`,
   cmd:`route print -4`,
   mac:`netstat -rn -f inet`,
   linux:`ip route`
  }},
 {id:"net-connections", level:"beginner",requires:{"elevation":true}, cat:"Network", title:"Active TCP connections + process",
  desc:"Established sessions and which process owns each.",
+ example_output:`LocalAddress LocalPort RemoteAddress RemotePort Process
+------------ --------- ------------- ---------- -------
+192.168.1.20     52344 140.82.113.25        443 chrome
+192.168.1.20     52350 34.107.221.82        443 Code`,
  code:{
   ps:`Get-NetTCPConnection -State Established |
   Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort,
-    @{n='Process';e={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}}`,
-  cmd:`netstat -ano | findstr ESTABLISHED`,
+    @{n='Process';e={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} |
+  Format-Table -AutoSize`,
+  cmd:`netstat -abno | findstr ESTABLISHED
+:: -b shows the owning program (run as admin)`,
   mac:`sudo lsof -nP -iTCP -sTCP:ESTABLISHED`,
   linux:`ss -tnp state established`
  }},
@@ -747,9 +776,15 @@ $s.Dispose(); $c.Dispose()`,
  }},
 {id:"net-shares", level:"beginner",requires:{"elevation":true}, cat:"Network", title:"Network shares & sessions",
  desc:"Local file shares being served and what's connected / mounted.",
+ example_output:`Name    Path        Description
+----    ----        -----------
+ADMIN$  C:\\Windows  Remote Admin
+C$      C:\\         Default share
+Data    D:\\Shared   Team files`,
  code:{
-  ps:`Get-SmbShare | Select-Object Name, Path, Description
-"-- sessions --"; Get-SmbSession | Select-Object ClientComputerName, ClientUserName, NumOpens`,
+  ps:`Get-SmbShare | Format-Table -AutoSize Name, Path, Description
+"-- sessions --"
+Get-SmbSession | Format-Table -AutoSize ClientComputerName, ClientUserName, NumOpens`,
   cmd:`net share
 echo -- sessions --
 net session`,
